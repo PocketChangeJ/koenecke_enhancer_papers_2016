@@ -1,0 +1,58 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE}
+library(GenomicRanges)
+library(ggplot2)
+library(dplyr)
+library(readr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_s6_enhancers_per_gene")
+
+set.seed(12345)
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+source("shared_code/flybase.r")
+source("shared_code/rnaseq.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Figure S6: Number of detected enhancers per gene
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r build_histogram}
+
+final_peaks.gr <- readRDS("figure_1c_cbp_peaks_with_differential_h3k27ac/final_peaks.gr.rds")
+
+txs.gr <- flybase_txs_granges()
+expressed_gene_ids <- genes_expressed_in_tissue(c("gd", "toll"), fpkm_threshold=5)
+
+expressed_txs.gr <- subset(txs.gr, fb_gene_id %in% .(expressed_gene_ids))
+
+diff.gr <- subset(final_peaks.gr, classification != "TSS" & diff_bound_class != "No change") %>%
+           assign_nearest_gene(expressed_txs.gr)
+
+nearest.df <- table(diff.gr$nearest_gene_id) %>% as.data.frame
+
+```
+
+``` {r plot_histogram, fig.cap="", fig.width=7, fig.height=3, dev=c("png", "pdf")}
+
+max_freq <- max(table(nearest.df$Freq))
+nearest.df$Freq <- factor(nearest.df$Freq, levels=as.character(sort(unique(nearest.df$Freq))))
+g <- ggplot(nearest.df, aes(x=Freq)) +
+     geom_bar(stat="count") +
+     scale_y_continuous(expand=c(0, 0), limits=c(0, max_freq * 1.05)) +
+     theme_manuscript() +
+     labs(x="\nEnhancers per gene", y="Genes\n")
+g
+```
+
+``` {r show_histogram_table}
+table(nearest.df$Freq) %>% as.data.frame %>% pander
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

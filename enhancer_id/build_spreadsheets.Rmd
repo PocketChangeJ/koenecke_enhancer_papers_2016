@@ -1,0 +1,363 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(GO.db)
+
+library(dplyr)
+library(tidyr)
+library(readr)
+library(magrittr)
+
+# Output folder for this document
+options(knitr.figure_dir = "build_spreadsheets")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/rnaseq.r")
+source("shared_code/flybase.r")
+source("shared_code/vienna_tiles.r")
+```
+
+# Spreadsheets
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Enhancer list
+
+``` {r load_rnaseq}
+
+fpkms.df <- rnaseq_fpkms() %>%
+            spread(tissue, FPKM)
+names(fpkms.df)[-1] %<>% paste0("_FPKM")
+names(fpkms.df)[1] <- "nearest_gene_id"
+
+rnaseq.df <- rnaseq_diff_exp_results()
+txs.gr <- flybase_txs_granges()
+
+expressed_genes <- genes_expressed_in_tissue(c("gd", "toll"), fpkm_threshold=5)
+
+txs.gr <- subset(txs.gr, fb_gene_id %in% .(expressed_genes))
+tss.gr <- resize(txs.gr, width=1)
+
+rna_gd_toll.df <- subset(rnaseq.df, sample_1 == "gd" & sample_2 == "toll")
+rna_gd_rm.df   <- subset(rnaseq.df, sample_1 == "gd" & sample_2 == "rm")
+rna_rm_toll.df <- subset(rnaseq.df, sample_1 == "rm" & sample_2 == "toll")
+
+rna_gd_toll.df$result <- "Not differential"
+rna_gd_toll.df$result[with(rna_gd_toll.df, significant == TRUE & direction == "up")] <- "Higher in Toll10b"
+rna_gd_toll.df$result[with(rna_gd_toll.df, significant == TRUE & direction == "down")] <- "Higher in gd7"
+rna_gd_toll.df %<>% select(nearest_gene_id = fb_gene_id, RNAseq_gd_vs_toll = result)
+
+rna_gd_rm.df$result <- "Not differential"
+rna_gd_rm.df$result[with(rna_gd_rm.df, significant == TRUE & direction == "up")] <- "Higher in rm9/rm10"
+rna_gd_rm.df$result[with(rna_gd_rm.df, significant == TRUE & direction == "down")] <- "Higher in gd7"
+rna_gd_rm.df %<>% select(nearest_gene_id = fb_gene_id, RNAseq_gd_vs_rm = result)
+
+rna_rm_toll.df$result <- "Not differential"
+rna_rm_toll.df$result[with(rna_rm_toll.df, significant == TRUE & direction == "up")] <- "Higher in Toll10b"
+rna_rm_toll.df$result[with(rna_rm_toll.df, significant == TRUE & direction == "down")] <- "Higher in rm9/rm10"
+rna_rm_toll.df %<>% select(nearest_gene_id = fb_gene_id, RNAseq_rm_vs_toll = result)
+
+rna.df <- fpkms.df %>%
+          merge(rna_gd_toll.df) %>%
+          merge(rna_gd_rm.df) %>%
+          merge(rna_rm_toll.df)
+```
+
+``` {r load_differential_regions}
+
+differential.gr <- readRDS("figure_1c_cbp_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>%
+                   resize(width=201, fix="center")
+
+differential.gr$mean_gd7_k27ac_score <- mcols(differential.gr)[, c("gd7_k27ac_1", "gd7_k27ac_2")] %>%
+                                        as.matrix %>%
+                                        rowMeans
+
+differential.gr$mean_toll10b_k27ac_score <- mcols(differential.gr)[, c("t10b_k27ac_1", "t10b_k27ac_2", "t10b_k27ac_3")] %>%
+                                            as.matrix %>%
+                                            rowMeans
+
+mcols(differential.gr) <- mcols(differential.gr)[, c("name", "classification", "mean_gd7_k27ac_score",
+                                                     "mean_toll10b_k27ac_score", "diff_bound_class",
+                                                     "diff_bound_pvalue")]
+
+vtol <- findOverlaps(query=differential.gr, subject=all_tiles.gr, ignore.strand=TRUE) %>% as.data.frame
+vtol$name <- differential.gr$name[vtol$queryHits]
+vtol$VTID <- all_tiles.gr$VTID[vtol$subjectHits]
+
+terms <- vt.df$annotation %>% unique
+amnio_terms <- terms[grep("amnio", terms)]
+meso_terms <- terms[grep("meso", terms)]
+
+amnio_tiles <- subset(vt.df, annotation %in% amnio_terms)$VTID %>% unique
+meso_tiles  <- subset(vt.df, annotation %in% meso_terms)$VTID %>% unique
+
+vts <- vtol %>%
+       group_by(name) %>%
+       summarize(ViennaTiles = paste(VTID, collapse=", "),
+                 TileHasMesoTerm = ifelse(sum(VTID %in% meso_tiles), "Yes", "No"),
+                 TileHasAmnioTerm = ifelse(sum(VTID %in% amnio_tiles), "Yes", "No"))
+
+known.gr <- read_csv("data/external/known_enhancers/TableS1_known_dv_enhancers_reassigned.csv") %>%
+            makeGRangesFromDataFrame(seqnames.field="chr", keep.extra=TRUE)
+
+kol <- findOverlaps(query=differential.gr, subject=known.gr, ignore.strand=TRUE) %>% as.data.frame
+kol$name <- differential.gr$name[kol$queryHits]
+kol$known_enhancer <- known.gr$name[kol$subjectHits]
+
+known_names <- kol %>%
+               group_by(name) %>%
+               summarize(KnownEnhancer = paste(known_enhancer, collapse=", "))
+
+differential.df <- differential.gr %>%
+                   assign_nearest_gene(txs.gr) %>%
+                   as.data.frame %>%
+                   select(name, chr = seqnames, start, end, classification, mean_gd7_k27ac_score, mean_toll10b_k27ac_score,
+                          differential_k27ac = diff_bound_class,
+                          differential_k27ac_pvalue = diff_bound_pvalue, nearest_gene_id, nearest_gene, distance_to_tss)
+
+differential.df <- merge(differential.df, rna.df, all.x=TRUE) %>%
+                   merge(vts, all.x=TRUE) %>%
+                   merge(known_names, all.x=TRUE)
+
+differential.df$ViennaTiles[is.na(differential.df$ViennaTiles)] <- ""
+differential.df$TileHasMesoTerm[is.na(differential.df$TileHasMesoTerm)] <- ""
+differential.df$TileHasAmnioTerm[is.na(differential.df$TileHasAmnioTerm)] <- ""
+differential.df$KnownEnhancer[is.na(differential.df$KnownEnhancer)] <- ""
+
+enhancers.df <- subset(differential.df, classification != "TSS" & differential_k27ac != "No change")
+
+```
+
+``` {r add_motifs}
+
+motifs.df <- readRDS("figure_s7_factor_binding_by_motif_analysis/motifs.df.rds")
+
+motif_m <- as.matrix(motifs.df[, -1])
+motifs.df[, -1] <- ""
+motifs.df[, -1][motif_m] <- "Yes"
+
+enhancers.df <- merge(enhancers.df, motifs.df)
+
+```
+
+``` {r add_enrichments}
+
+enrichments.df <- readRDS("calculate_tx_factor_enrichments/enrichments.df.rds") %>%
+                  filter(factor %in% c("Mad", "Snail", "Twist", "Dorsal", "Zen", "Zelda")) %>%
+                  spread(factor, enrichment)
+
+enhancers.df <- merge(enhancers.df, enrichments.df)
+```
+
+``` {r add_high_confidence_columns}
+
+one_or_blank <- function(x) {
+  ifelse(x, "1", "")
+}
+
+yes_or_blank <- function(x) {
+  ifelse(x, "Yes", "")
+}
+
+enhancers.df %<>% mutate(HighConfidence_GeneExpression = yes_or_blank(differential_k27ac == RNAseq_gd_vs_toll & 
+                                                                differential_k27ac != "No change" &
+                                                                !((rm_FPKM > gd_FPKM) & (rm_FPKM > toll_FPKM))),
+                         HighConfidence_TFBinding = yes_or_blank((differential_k27ac == "Higher in Toll10b" & (Twist > 5 | Dorsal > 3)) |
+                                                           (differential_k27ac == "Higher in gd7" & (Mad > 3 | Zen > 3))),
+                         HighConfidence_Combined = yes_or_blank(HighConfidence_GeneExpression == "Yes" & HighConfidence_TFBinding == "Yes"))
+
+```
+
+``` {r assign_names}
+
+known.df <- read_csv("data/external/known_enhancers/TableS1_known_dv_enhancers_reassigned.csv")
+known.df$activity %<>% gsub("mesoderm", "m", .) %>%
+                       gsub("dorsal ectoderm", "de", .)
+names(known.df)[which(names(known.df) == "name")] <- "enhancer_name"
+
+known_names <- known.df %>%
+               mutate(type = ifelse(activity == "m", "ME", "DEE"),
+                      name = paste0(" ", enhancer_name),
+                      current_name = name) %>%
+               select(current_name, 
+                      peak_name = name,
+                      gene = gene_name,
+                      start_coord = start,
+                      type)
+
+current_names <- enhancers.df %>%
+                 mutate(type = ifelse(differential_k27ac == "Higher in Toll10b", "ME", "DEE"),
+                        current_name = "ZZZ") %>%
+                 select(current_name,
+                        peak_name = name,
+                        gene = nearest_gene,
+                        start_coord = start,
+                        type)
+
+names.df <- bind_rows(known_names, current_names)
+
+names.df <- arrange(names.df, gene, current_name, start_coord) %>%
+            group_by(gene) %>%
+            mutate(new_id = paste0(gene, "-", type, 1:n()))
+
+#names.df$new_id %<>% gsub("-ME1$", "-MEE", .) %>%
+#                     gsub("-DEE1$", "-DE", .)
+
+enhancers.df %<>% mutate(peak_name = name)
+enhancers.df$name <- names.df$new_id[match(enhancers.df$name, names.df$peak_name)]
+
+enhancers.df %<>% select(peak_name, name, chr, start, end, classification, nearest_gene, nearest_gene_id, distance_to_tss, everything())
+
+head(enhancers.df) %>% pander(caption="enhancer_list.xls")
+```
+
+
+
+``` {r write_enhancers_spreadsheet}
+# rm9/rm10 genes excluded
+
+dv_genes <- filter(enhancers.df, differential_k27ac == RNAseq_gd_vs_toll) %>%
+            filter(!(RNAseq_gd_vs_rm == "Higher in rm9/rm10" & RNAseq_rm_vs_toll == "Higher in rm9/rm10")) %>%
+            select(nearest_gene_id, nearest_gene, RNAseq_gd_vs_toll) %>%
+            unique
+
+fbgo <- read.delim("flybase/gene_association.fb.txt", stringsAsFactors=FALSE, header=FALSE, skip=5)
+
+go_ontology <- data_frame(go_id = names(Ontology(GOTERM)),
+                          ontology = Ontology(GOTERM))
+go_terms <- data_frame(go_id = names(Term(GOTERM)),
+                       term = Term(GOTERM))
+go_df <- merge(go_ontology, go_terms) %>%
+         filter(ontology == "BP")
+
+go_terms_for_gene <- function(fb_gene_id, fbgo, go_df) {
+  go_ids <- subset(fbgo, V2 == fb_gene_id)$V5 %>% unique
+  go_df %>% 
+    filter(go_id %in% go_ids) %>%
+    `$`(term) %>%
+    unique %>%
+    paste0(collapse=", ")
+}
+
+dv_genes$go_bp_terms <- dv_genes$nearest_gene_id %>%
+                        lapply(go_terms_for_gene, fbgo, go_df) %>%
+                        unlist
+
+write.table(dv_genes, file=figure_path("dv_genes.xls"), quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
+
+saveRDS(enhancers.df, file=figure_path("enhancer_list.df.rds"))
+
+enhancers.df %<>% select(peak_name, 
+                         enhancer_name=name,
+                         chr,
+                         start,
+                         end,
+                         classification,
+                         nearest_gene,
+                         nearest_gene_id,
+                         distance_to_tss,
+                         mean_gd7_k27ac_score,
+                         mean_toll10b_k27ac_score,
+                         differential_k27ac,
+                         differential_k27ac_pvalue,
+                         gd7_FPKM=gd_FPKM,
+                         tollrm9rm10_FPKM=rm_FPKM,
+                         toll10b_FPKM=toll_FPKM,
+                         RNAseq_gd7_vs_toll10b=RNAseq_gd_vs_toll,
+                         RNAseq_gd7_vs_tollrm9rm10=RNAseq_gd_vs_rm,
+                         RNAseq_tollrm9rm10_vs_toll10b=RNAseq_rm_vs_toll,
+                         contains("Tile"),
+                         KnownEnhancer,
+                         starts_with("FlyFactor"),
+                         starts_with("JASPAR"),
+                         Dorsal, 
+                         Mad,
+                         Snail,
+                         Twist,
+                         Zelda,
+                         Zen,
+                         HighConfidence_GeneExpression,
+                         HighConfidence_TFBinding,
+                         HighConfidence_Combined)
+
+write.table(enhancers.df, file=figure_path("enhancer_list.xls"), quote=FALSE, na="", row.names=FALSE, col.names=TRUE, sep="\t")
+```
+
+## TSS regions with differential H3K27ac list
+
+``` {r tss_regions}
+
+strip_if_one <- function(x) {
+  if(length(x) == 1) {
+    return("")
+  } else {
+    return(x)
+  }
+}
+
+tss.df <- subset(differential.df, classification == "TSS" & differential_k27ac != "No change")
+tss.df %<>% select(name, chr, start, end, classification, nearest_gene, nearest_gene_id, distance_to_tss, everything())
+
+tss_assignments.df <- tss.df %>%
+                      select(name, chr, start, end) %>%
+                      makeGRangesFromDataFrame(seqnames.field="chr", keep.extra=TRUE) %>%
+                      assign_nearest_gene(flybase_txs_granges()) %>%
+                      as.data.frame %>%
+                      select(name = name,
+                             assigned_tss_fb_gene_id = nearest_gene_id,
+                             assigned_tss_gene       = nearest_gene)
+
+tss.df %<>% merge(tss_assignments.df) %>%
+            mutate(type = ifelse(differential_k27ac == "Higher in Toll10b", "ME", "DEE"))
+
+tss.df <- arrange(tss.df, nearest_gene, start) %>%
+            group_by(nearest_gene) %>%
+            mutate(new_id = paste0(nearest_gene, "-", type, strip_if_one(1:n()), "@", assigned_tss_gene, "-TSS")) %>%
+            select(peak_name = name,
+                   name = new_id,
+                   chr, start, end, classification,
+                   assigned_tss_gene, assigned_tss_fb_gene_id,
+                   nearest_expressed_gene = nearest_gene,
+                   nearest_expressed_gene_id = nearest_gene_id,
+                   gd7_FPKM=gd_FPKM,
+                   tollrm9rm10_FPKM=rm_FPKM,
+                   toll10b_FPKM=toll_FPKM,
+                   RNAseq_gd7_vs_toll10b=RNAseq_gd_vs_toll,
+                   RNAseq_gd7_vs_tollrm9rm10=RNAseq_gd_vs_rm,
+                   RNAseq_tollrm9rm10_vs_toll10b=RNAseq_rm_vs_toll,
+                   everything()) %>%
+            select(-distance_to_tss, -type)
+
+tss_enrichments.df <- readRDS("calculate_tx_factor_enrichments/tss_enrichments.df.rds") %>%
+                      filter(factor %in% c("Mad", "Snail", "Twist", "Dorsal", "Zen", "Zelda")) %>%
+                      spread(factor, enrichment) %>%
+                      rename(peak_name = name)
+
+tss.df %<>% merge(tss_enrichments.df)
+
+head(tss.df) %>% pander(caption="tss_regions_list.xls")
+saveRDS(tss.df, file=figure_path("tss_regions_list.df.rds"))
+write.table(tss.df, file=figure_path("tss_regions_list.xls"), quote=FALSE, na="", row.names=FALSE, col.names=TRUE, sep="\t")
+```
+
+## Other peaks
+
+``` {r other_peaks}
+
+txfactors <- readRDS("figure_2b_cbp_nearest_gene_comparison/nearest_gene_groups.list.rds") %>%
+             lapply(function(gr) {
+               if(is.null(gr$name[1])) gr$name <- paste0("peak_", seq_along(gr))
+               select(as.data.frame(gr), chr = seqnames, start, end, name)
+             }) %>%
+             bind_rows(.id="peak_group_name")
+
+txfactors %>% 
+  group_by(peak_group_name) %>%
+  summarize(peaks = pn(n())) %>%
+  pander
+              
+write.table(txfactors, file=figure_path("other_peaks.xls"), quote=FALSE, na="", row.names=FALSE, col.names=TRUE, sep="\t")
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

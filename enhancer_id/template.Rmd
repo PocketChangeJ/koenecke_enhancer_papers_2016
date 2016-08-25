@@ -1,0 +1,17 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+
+# Output folder for this document
+options(knitr.figure_dir = "template")
+
+source("shared_code/knitr_common.r")
+```
+
+# Document title
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

@@ -1,0 +1,171 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(GenomicRanges)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+library(readxl)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_3c_5a_tx_binding_at_cbp_enhancers")
+
+source("shared_code/knitr_common.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Figure 3c and 5a: Transcription factor binding at CBP enhancers
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+In this figure target genes are divided into 4 groups and detected enhancers are classified by transcription factor binding. This requires that we create a separate plot for mesoderm and dorsal ectoderm enhancers.
+
+We start with detected enhancers where the differential expression of the nearest gene matches the differential H3K27ac. 
+
+** Remove known enhancers
+
+Mesoderm:
+
+  1. Dorsal enrichment > 3
+  2. Twist enrichment > 5
+
+Dorsal ectoderm:
+
+  1. Mad enrichment > 3
+  2. Zen enrichment > 3
+
+``` {r load_data}
+
+ss.df <- readRDS("build_spreadsheets/enhancer_list.df.rds") %>%
+         filter(differential_k27ac == RNAseq_gd_vs_toll) %>%
+         filter(KnownEnhancer == "") %>%
+         filter(!((rm_FPKM > gd_FPKM) & (rm_FPKM > toll_FPKM))) %>%
+         select(name, nearest_gene_id, nearest_gene, 
+                rm_FPKM, gd_FPKM, toll_FPKM, 
+                differential_k27ac,
+                Dorsal, Mad, Snail, Twist, Zelda, Zen) 
+
+## Add a TSS enhancer
+
+tss.df <- readRDS("calculate_tx_factor_enrichments/tss_enrichments.df.rds") %>%
+          filter(name == "Peak_2255")
+
+tss_addition <- data_frame(name = "Dll-DEE (CG42851 TSS)",
+                           nearest_gene_id = "FBgn0000157",
+                           nearest_gene = "Dll",
+                           differential_k27ac = "Higher in gd7",
+                           Dorsal = subset(tss.df, factor == "Dorsal")$enrichment,
+                           Mad    = subset(tss.df, factor == "Mad")$enrichment,
+                           Snail  = subset(tss.df, factor == "Snail")$enrichment,
+                           Twist  = subset(tss.df, factor == "Twist")$enrichment,
+                           Zelda  = subset(tss.df, factor == "Zelda")$enrichment,
+                           Zen    = subset(tss.df, factor == "Zen")$enrichment)
+
+ss.df %<>% bind_rows(tss_addition)
+
+genes.df <- select(ss.df, nearest_gene_id, nearest_gene, differential_k27ac) %>% unique
+
+
+# Need updated categorizations
+#stop()
+
+
+dl_targets <- subset(ss.df, Dorsal > 3 & differential_k27ac == "Higher in Toll10b") %>%
+              mutate(gene_group = "Dorsal")
+remaining  <- subset(ss.df, Dorsal <= 3 | differential_k27ac != "Higher in Toll10b")
+
+twi_targets <- subset(remaining, Twist > 5 & differential_k27ac == "Higher in Toll10b") %>%
+               mutate(gene_group = "Twist")
+remaining   <- subset(remaining, Twist <= 5 | differential_k27ac != "Higher in Toll10b")
+
+mad_targets <- subset(remaining, Mad > 3 & differential_k27ac == "Higher in gd7") %>%
+               mutate(gene_group = "Mad")
+remaining   <- subset(remaining, Mad <= 3 | differential_k27ac != "Higher in gd7")
+
+zen_targets <- subset(remaining, Zen > 3 & differential_k27ac == "Higher in gd7") %>%
+               mutate(gene_group = "Zen")
+remaining   <- subset(remaining, Zen <= 3 | differential_k27ac != "Higher in gd7")
+
+targets.df <- bind_rows(dl_targets, twi_targets, mad_targets, zen_targets)
+
+flat.df <- gather(targets.df, factor_name, enrichment, Dorsal:Zen)
+flat.df$factor_name <- factor(flat.df$factor_name, levels=c("Dorsal", "Twist", "Snail", "Mad", "Zen", "Zelda"))
+
+flat.df$enrichment <- pmax(0, flat.df$enrichment)
+flat.df %<>% group_by(factor_name) %>%
+             mutate(normalized_enrichment = pmin(1, pmax(0, enrichment / quantile(enrichment, 0.98))))
+
+genes_needing_categories <- flat.df %>%
+                            ungroup %>%
+                            select(nearest_gene_id, nearest_gene, differential_k27ac, ends_with("FPKM")) %>%
+                            unique
+
+genes_needing_categories$gene_category <- ""
+write.table(genes_needing_categories, file=figure_path("selected_gene_targets_of_new_enhancers.xls"), quote=F, sep="\t", row.names=FALSE, col.names=TRUE)
+
+gene_categories <- read_excel("data/internal/selected_gene_targets_of_new_enhancers_categorized.xlsx")
+gene_id <- names(gene_categories)[grep("nearest_gene_id", names(gene_categories))]
+cat_id  <- names(gene_categories)[grep("gene_category", names(gene_categories))]
+gene_categories <- gene_categories[, c(gene_id, cat_id)]
+names(gene_categories) <- c("nearest_gene_id", "gene_category")
+gene_categories$gene_category[is.na(gene_categories$gene_category)] <- "Unclassified"
+
+flat.df %<>% merge(gene_categories, all.x=TRUE)
+
+missing <- which(is.na(gene_categories$gene_category))
+if(length(missing) > 0) gene_categories$gene_category <- "Unclassified"
+
+flat.df$gene_group_and_category <- paste0(flat.df$gene_category, "_", flat.df$gene_group)
+flat.df$name <- factor(flat.df$name, levels=rev(sort(unique(flat.df$name))))
+
+```
+
+``` {r plot_heatmap, fig.cap="", fig.width=6, fig.height=12, dev=c("png", "pdf")}
+
+apply_category_order <- function(data.df) {
+  groups <- unique(data.df$gene_group_and_category)
+  ordered_groups <- c("Tx", "Sig", "Morpho", "Other", "Unclassified") %>% 
+                    lapply(function(g) {
+                      groups[grep(g, groups)] %>% sort
+                    }) %>%
+                    do.call(c, .)
+  data.df$gene_group_and_category %<>% factor(levels=ordered_groups)
+  data.df
+}
+
+meso.df <- subset(flat.df, differential_k27ac == "Higher in Toll10b") %>%
+           apply_category_order
+de.df   <- subset(flat.df, differential_k27ac == "Higher in gd7") %>%
+           apply_category_order
+
+g.m <- ggplot(meso.df, aes(x=factor_name, y=name, fill=normalized_enrichment)) +
+       geom_tile() +
+       scale_fill_gradient("Enrichment", high="darkred", low="white") +
+       facet_grid(gene_group_and_category ~ ., scales="free_y", space="free_y", drop=FALSE) +
+       theme_bw() +
+       theme(axis.text.y=element_text(size=6),
+             panel.grid.major=element_blank(),
+             panel.grid.minor=element_blank()) +
+       scale_x_discrete(expand=c(0, 0)) +
+       scale_y_discrete(expand=c(0, 0)) +
+       labs(x="", y="", title="Mesoderm enhancers")
+
+g.m
+
+g.de <- ggplot(de.df, aes(x=factor_name, y=name, fill=normalized_enrichment)) +
+        geom_tile() +
+        scale_fill_gradient("Enrichment", high="darkred", low="white") +
+        facet_grid(gene_group_and_category ~ ., scales="free_y", space="free_y", drop=FALSE) +
+        theme_bw() +
+        theme(axis.text.y=element_text(size=6)) +
+        scale_x_discrete(expand=c(0, 0)) +
+        scale_y_discrete(expand=c(0, 0)) +
+        labs(x="", y="", title="Dorsal ectoderm enhancers")
+
+g.de
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

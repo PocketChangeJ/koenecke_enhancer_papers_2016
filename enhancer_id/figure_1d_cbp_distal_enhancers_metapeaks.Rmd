@@ -1,0 +1,98 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(magrittr)
+library(dplyr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_1d_cbp_distal_enhancers_metapeaks")
+
+source("shared_code/knitr_common.r")
+source("shared_code/ggplot_theme.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+source("shared_code/metapeaks.r")
+```
+
+# Figure 1d: H3K27ac metapeak at distal CBP enhancers
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+These metapeaks show the regions +/- 2 kilobases surrounding the putative mesoderm and dorsal ectoderm non-TSS enhancers.
+
+``` {r build_metapeak}
+
+bigwigs <- list("Mesoderm H3K27ac"=list(ip=sample_bigwig("tl10b_h3k27ac_1", bigwig="ip"),
+                                        wce=sample_bigwig("tl10b_h3k27ac_1", bigwig="wce")),
+                "Dorsal ectoderm H3K27ac"=list(ip=sample_bigwig("gd7_h3k27ac_1", bigwig="ip"),
+                                               wce=sample_bigwig("gd7_h3k27ac_1", bigwig="wce")),
+                "Nejire"=list(ip=sample_bigwig("orer_nej_1", bigwig="ip"),
+                              wce=sample_bigwig("orer_nej_1", bigwig="wce")))
+
+enhancers.gr <- readRDS("figure_1c_cbp_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>%
+                subset(classification != "TSS" & diff_bound_class != "No change") %>%
+                resize(width=1, fix="center")
+
+enhancers.grl <- split(enhancers.gr, enhancers.gr$diff_bound_class) %>%
+                 as.list
+
+reads.df <- cache("reads.df", function() {
+  multisample_enrichment_metapeak(enhancers.grl, bigwigs, upstream=2000, downstream=2000, smooth=31, cores=3)
+})
+
+meso.df <- subset(reads.df, peak_group == "Higher in Toll10b")
+de.df   <- subset(reads.df, peak_group == "Higher in gd7")
+
+ylim <- max(reads.df$enrichment) * 1.10
+
+colors <- c("Mesoderm H3K27ac"="#49539E",
+            "Dorsal ectoderm H3K27ac"="#FCB13C",
+            "Nejire"="#808080")
+
+build_plot <- function(reads.df, plot_title, ylim=ylim) {
+  reads.left <- subset(reads.df, tss_distance <= 0 & sample_name != "Nejire")
+  reads.right <- subset(reads.df, tss_distance > 0 & sample_name != "Nejire")
+  
+  xhigh_left  <- reads.left$tss_distance[which.max(reads.left$enrichment)]
+  xhigh_right <- reads.right$tss_distance[which.max(reads.right$enrichment)]
+  yhigh_left <- max(reads.left$enrichment)
+  yhigh_right <- max(reads.right$enrichment)
+  
+  g <- ggplot(reads.df, aes(x=tss_distance, y=enrichment, color=sample_name)) +
+       geom_line(size=1.2) +
+       theme_manuscript() +
+       scale_x_continuous(expand=c(0, 0)) +
+       scale_y_continuous(expand=c(0, 0), limits=c(0, ylim)) +
+       scale_colour_manual("", values=colors) +
+       geom_segment(x=xhigh_left, xend=xhigh_left, y=yhigh_left, yend=Inf, color="black", linetype="dotted") +
+       geom_segment(x=xhigh_right, xend=xhigh_right, y=yhigh_right, yend=Inf, color="black", linetype="dotted") +
+       annotate("text", x=xhigh_left, y=Inf, label=paste0(xhigh_left, " "), vjust=1, hjust=1) +
+       annotate("text", x=xhigh_right, y=Inf, label=paste0(" ", xhigh_right), vjust=1, hjust=0) +
+       labs(x="\nDistance to Nejire peak center",
+            y="Average enrichment over WCE\n",
+            title=plot_title)
+  g
+}
+
+g.meso <- build_plot(meso.df, "Higher in mesoderm", ylim)
+g.de   <- build_plot(de.df, "Higher in dorsal ectoderm", ylim)
+     
+```
+
+``` {r region_counts}
+
+data_frame(Regions=names(enhancers.grl),
+           Count=elementLengths(enhancers.grl)) %>%
+  pander(caption="Regions displayed in metapeak")
+
+```
+
+``` {r plot_metapeak, fig.cap="", fig.width=8, fig.height=6, dev=c("png", "pdf")}
+g.meso
+g.de
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

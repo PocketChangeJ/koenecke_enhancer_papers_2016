@@ -1,0 +1,165 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(TxDb.Dmelanogaster.UCSC.dm3.ensGene)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+library(rtracklayer)
+library(magrittr)
+library(dplyr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_4a_conservation_example_region")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+source("shared_code/gviz.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Figure 4A: Conservation examples
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r bigwigs, message=FALSE}
+
+bigwigs <- list("Meso K27Ac"=sample_bigwig("tl10b_h3k27ac_3", bigwig="enrichment"),
+                "DE K27Ac"=sample_bigwig("gd7_h3k27ac_1", bigwig="enrichment"),
+                "Twist"=sample_bigwig("tl10b_twi_1", type="rpm"),
+                "Dorsal"=sample_bigwig("tl10b_dl_1", type="rpm"),
+                "Zen"=sample_bigwig("gd7_zen_1", type="rpm"),
+                "Snail"=sample_bigwig("orer_sna_1", type="rpm"),
+                "Conservation"=data_path("phastcon/phastcon_15way.bw"))
+
+colors <- list("Meso K27Ac"="#49539E",
+               "DE K27Ac"="#FCB13C",
+               "Dorsal"="#A2BB75",
+               "Twist"="#3BA672",
+               "Zen"="#DBCD9E",
+               "Snail"="#ADDBE8",
+               "Conservation"="black")
+
+enhancers.gr <- readRDS("build_spreadsheets/enhancer_list.df.rds") %>%
+                select(name, chr, start, end) %>%
+                makeGRangesFromDataFrame(seqnames.field="chr", keep.extra=TRUE)
+
+e_regions.gr <- resize(enhancers.gr, width=5000, fix="center")
+```
+
+``` {r common}
+
+build_track <- function(factor_name, bigwigs, region.gr, factor_colors, max_value=NA) {
+  if(is.na(max_value)) max_value = max_value(bigwigs[[factor_name]], region.gr)
+  
+  gviz_data_track(bigwigs[[factor_name]], factor_name, factor_colors[[factor_name]], max_value)
+}
+
+plot_region <- function(region.gr, bws, track_colors, enhancers.gr) {
+  stopifnot(length(region.gr) == 1)
+  
+  r_chr <- as.character(seqnames(region.gr))
+  r_start <- start(region.gr)
+  r_end   <- end(region.gr)
+  
+  grtrack <- GeneRegionTrack(range=TxDb.Dmelanogaster.UCSC.dm3.ensGene,
+                             genome="dm3",
+                             chromosome=r_chr,
+                             name="Genes",
+                             showId=FALSE,
+                             geneSymbol=TRUE,
+                             fill="black", collapseTranscripts=FALSE)
+  
+  max_enrichments <- bws %>% 
+                     checked_mclapply(max_value, region.gr, mc.cores=6, mc.preschedule=FALSE) %>%
+                     unlist
+
+  max_e_all     <- max_enrichments %>% max %>% ceiling
+  max_e_histone <- max_enrichments[1:2] %>% max %>% ceiling
+  
+  e.gr <- enhancers.gr[seqnames(enhancers.gr) == r_chr]
+  e.gr$feature <- "enhancer"
+  e.gr$id <- e.gr$name
+  enhancers_track <- AnnotationTrack(range=e.gr, strand=rep("*", length(e.gr)),
+                                     genome="dm3", name="Enhancers", showFeatureId=TRUE,
+                                     stacking="dense", fill="black", fontcolor="black", fontcolor.group="black", fontsize=5)
+  
+  datatracks_histones <- names(bws)[1:2] %>%
+                         lapply(build_track, bws, region.gr, track_colors, max_e_histone)
+
+  datatracks_other <- names(bws)[3:length(bws)] %>%
+                      lapply(build_track, bws, region.gr, track_colors)
+
+  datatracks <- c(datatracks_histones, datatracks_other)
+
+  list(gene_track=grtrack, axis_track=GenomeAxisTrack(), data_tracks=datatracks, enhancers_track=enhancers_track, 
+       region_chr=r_chr, region_start=r_start, region_end=r_end, region_name=region.gr$name)
+}
+
+track_list <- function(track_list) {
+  c(list(track_list$axis_track), track_list$data_tracks, list(track_list$enhancers_track, track_list$gene_track))
+}
+
+```
+
+``` {r build_figures}
+
+regions_to_granges <- function(regions) {
+  chrs <- gsub("^(.*):.*$", "\\1", regions)
+  starts <- gsub("^.*:(.*)-.*$", "\\1", regions) %>% gsub(",", "", .) %>% as.integer
+  ends <- gsub("^.*:.*-(.*)$", "\\1", regions) %>% gsub(",", "", .) %>% as.integer
+
+  GRanges(ranges=IRanges(starts, ends), seqnames=chrs, name=regions)
+}
+
+named_regions_to_granges <- function(regions) {
+  gr <- subset(e_regions.gr, name %in% .(regions))
+  stopifnot(length(gr) == length(regions))
+  gr
+}
+
+region.gr <- as(gsub(",", "", "chr2L:8,264,915-8,268,914"), "GRanges")
+region.gr$name <- "chr2L 8,264,915 - 8,268,914"
+
+bigwigs.example1 <- bigwigs[names(bigwigs) %in% c("Meso K27Ac", "DE K27Ac", "Zen", "Snail", "Conservation")]
+
+track <- plot_region(region.gr, bigwigs.example1, colors, enhancers.gr)
+
+```
+
+## Example (Mad/Zen/Snail)
+
+``` {r display_example_figure1, fig.width=28, fig.height=28, dev=c("pdf")}
+
+example_region <- plotTracks(track_list(track),
+                     sizes=c(0.2, 1, 1, 1, 1, 0.5, 0.2, 0.2),
+                     chromosome=track$region_chr,
+                     from=track$region_start,
+                     to=track$region_end,
+                     main=track$region_name,
+                     cex.title=0.8, col.title="black", col.axis="black",
+                     fontcolor.legend="black", cex.legend=0.5) 
+```
+
+## Example (Dorsal/Twist)
+
+``` {r display_example_figure2, fig.width=28, fig.height=28, dev=c("pdf")}
+
+region.gr <- as(gsub(",", "", "chrX:16,666,658-16,671,358"), "GRanges")
+region.gr$name <- "chrX 16,666,658 16,671,358"
+
+bigwigs.example2 <- bigwigs[names(bigwigs) %in% c("Meso K27Ac", "DE K27Ac", "Dorsal", "Twist", "Conservation")]
+
+track <- plot_region(region.gr, bigwigs.example2, colors, enhancers.gr)
+
+example_region <- plotTracks(track_list(track),
+                     sizes=c(0.2, 1, 1, 1, 1, 0.5, 0.2, 0.2),
+                     chromosome=track$region_chr,
+                     from=track$region_start,
+                     to=track$region_end,
+                     main=track$region_name,
+                     cex.title=0.8, col.title="black", col.axis="black",
+                     fontcolor.legend="black", cex.legend=0.5) 
+```
+
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

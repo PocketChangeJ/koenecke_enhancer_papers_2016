@@ -1,0 +1,89 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(dplyr)
+library(magrittr)
+
+# Output folder for this document
+options(knitr.figure_dir = "calculate_tx_factor_enrichments")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+```
+
+# Calculate transcription factor enrichments at detected enhancers
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+``` {r load_data}
+enhancers.gr <- readRDS("figure_1c_cbp_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>%
+                subset(classification != "TSS" & diff_bound_class != "No change") %>%
+                resize(width=201, fix="center")
+
+tss_enhancers.gr <- readRDS("figure_1c_cbp_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>%
+                    subset(classification == "TSS" & diff_bound_class != "No change") %>%
+                    resize(width=201, fix="center")
+
+mcols(enhancers.gr) <- mcols(enhancers.gr)[, "name", drop=FALSE]
+mcols(tss_enhancers.gr) <- mcols(tss_enhancers.gr)[, "name", drop=FALSE]
+```
+
+``` {r calculate_enrichments_at_detected_enhancers}
+
+enrichments_for_factor <- function(factor_name, bigwig_list, gr) {
+  ip_bw  <- sample_bigwig(bigwig_list[[factor_name]], bigwig="ip")
+  wce_bw <- sample_bigwig(bigwig_list[[factor_name]], bigwig="wce")
+
+  stopifnot(file.exists(ip_bw))
+  stopifnot(file.exists(wce_bw))
+
+  start(gr) <- end(gr) <- regionWhichMaxs(gr, ip_bw)
+  region.gr <- resize(gr, width=201, fix="center")
+  ip  <- regionSums(region.gr, ip_bw)
+  wce <- regionSums(region.gr, wce_bw)
+
+  gr$enrichment <- log2( (ip / total_signal(ip_bw)) / (wce / total_signal(wce_bw)) )
+  gr$factor <- factor_name
+  as.data.frame(gr)[, c("name", "enrichment", "factor")]
+}
+
+bws <- list("Nejire" = "orer_nej_1",
+            "Twist"  = "tl10b_twi_1", 
+            "Snail"  = "orer_sna_1",
+            "Dorsal" = "tl10b_dl_1",
+            "Zelda"  = "gd7_zld_1",
+            "Mad"    = "gd7_mad_2",
+            "Zen"    = "gd7_zen_1")
+       
+enrichments.df <- cache("enrichments.df", function() {
+  names(bws) %>%
+    mclapply(enrichments_for_factor, bws, enhancers.gr, mc.cores=5, mc.preschedule=FALSE) %>%
+    bind_rows
+})
+
+tss_enrichments.df <- cache("tss_enrichments.df", function() {
+  names(bws) %>%
+    mclapply(enrichments_for_factor, bws, tss_enhancers.gr, mc.cores=5, mc.preschedule=FALSE) %>%
+    bind_rows
+})
+
+```
+
+```{r enrichment_summary_table}
+
+enrichments.df %>%
+  group_by(factor) %>%
+  summarize(median_enrichment = median(enrichment)) %>%
+  pander(caption="Enrichment at distal enhancers")
+
+tss_enrichments.df %>%
+  group_by(factor) %>%
+  summarize(median_enrichment = median(enrichment)) %>%
+  pander(caption="Enrichment at TSS enhancers")
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

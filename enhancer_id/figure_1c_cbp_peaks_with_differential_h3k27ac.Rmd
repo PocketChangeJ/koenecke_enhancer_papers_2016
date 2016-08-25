@@ -1,0 +1,359 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE}
+library(xtable)
+library(GenomicRanges)
+library(ggplot2)
+library(stringr)
+library(dplyr)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+library(DESeq2)
+library(readr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_1c_cbp_peaks_with_differential_h3k27ac")
+
+set.seed(12345)
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+source("shared_code/metapeaks.r")
+source("shared_code/flybase.r")
+source("shared_code/rnaseq.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Figure 1c: Identifying CBP peaks with differential H3K27ac using DESeq2
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r location_of_data, include=FALSE}
+
+nej.bw <- sample_bigwig("orer_nej_1", bigwig="ip")
+wce.bw <- sample_bigwig("orer_nej_1", bigwig="wce")
+
+gd7.ranges  <- c("gd7_h3k27ac_1.granges.rds", 
+                 "gd7_h3k27ac_2.granges.rds")
+
+t10b.ranges <- c("tl10b_h3k27ac_1.granges.rds",
+                 "tl10b_h3k27ac_3.granges.rds",
+                 "tl10b_h3k27ac_4.granges.rds")
+
+```
+
+## Overview
+
+Outline:
+
+ * Call peaks in Nej (wild-type) sample
+ * Divide into groups: near TSS, inside gene, intergenic
+ * Measure H3K27Ac signal in 1kb window around summit for Toll10b and gd7
+ * Identify peaks with differential H3K27Ac (DESeq2)
+ * Find enriched motifs using multiple window sizes around summits
+
+## Peak calling
+
+Peakzilla was run for the Nej IP sample against an Oregon-R WCE, yielding the following number of peaks:
+
+``` {r peak_counts, warning=FALSE, results="asis"}
+
+import_peakzilla <- function(filename) {
+  pz <- read.delim(filename, stringsAsFactors=FALSE, header=TRUE)
+  GRanges(ranges   = IRanges(start=pz$Summit, end=pz$Summit), 
+          seqnames = pz$X.Chromosome, 
+          name     = pz$Name,
+          score    = pz$Score)
+}
+
+peaks.gr <- import_peakzilla(data_path(file.path("peakzilla", "orer_nej_1.tsv"))) %>%
+            filter_chrs
+
+peak_counts.df <- data.frame(Sample="Nej wild-type", 
+                             Peaks=pn(length(peaks.gr)))
+
+peak_counts.df %>% pander
+```
+
+We will first filter these peaks to include only those that are at least 2-fold enriched over background (measured in a 201bp window at the summit):
+
+``` {r filter_peaks, include=FALSE}
+
+add_enrichment <- function(peaks.gr, ip.bw, wce.bw) {
+  
+  peaks.gr <- resize(peaks.gr, width=201, fix="center")
+  
+  mcols(peaks.gr)$ip_signal  <- regionSums(peaks.gr, ip.bw)  / total_signal(ip.bw) * 150 * 1e6
+  mcols(peaks.gr)$wce_signal <- regionSums(peaks.gr, wce.bw) / total_signal(wce.bw) * 150 * 1e6
+  mcols(peaks.gr)$enrichment <- with(mcols(peaks.gr), log2(ip_signal / wce_signal))
+  peaks.gr[mcols(peaks.gr)$enrichment >= 1]
+}
+
+filtered_peaks.gr <- cache("filtered_peaks.gr", function() {
+  add_enrichment(peaks.gr, nej.bw, wce.bw)
+})
+
+```
+
+``` {r filtered_peak_counts, results="asis"}
+filtered_peak_counts.df <- data.frame(Sample="Nej", 
+                             Peaks=pn(length(filtered_peaks.gr)))
+
+filtered_peak_counts.df %>% pander
+```
+
+## Classify peaks by proximity to nearest gene
+
+Each peak will be assigned to one of the following categories:
+
+  - TSS (within 1kb of a TSS)
+  - Inside gene
+  - Intergenic
+
+``` {r classify_peaks, include=FALSE}
+
+txs.gr <- filter_chrs(flybase_txs_granges())
+
+add_classification <- function(peaks.gr) {
+  
+  tss.gr <- resize(txs.gr, width=1)
+  
+  dtn_tss <- subset(as.data.frame(distanceToNearest(peaks.gr, tss.gr, ignore.strand=TRUE)), distance <= 1000)
+  
+  peaks.tss <- peaks.gr[dtn_tss$queryHits]
+  peaks.other <- peaks.gr[-dtn_tss$queryHits]
+  
+  dtn_gene <- subset(as.data.frame(distanceToNearest(peaks.other, txs.gr, ignore.strand=TRUE)), distance == 0)
+  
+  peaks.gene <- peaks.other[dtn_gene$queryHits]
+  peaks.intergenic <- peaks.other[-dtn_gene$queryHits]  
+  
+  mcols(peaks.tss)$classification <- "TSS"
+  mcols(peaks.gene)$classification <- "Inside_Gene"
+  mcols(peaks.intergenic)$classification <- "Intergenic"
+
+  peaks.classified <- c(peaks.tss, peaks.gene, peaks.intergenic)
+
+  stopifnot(length(peaks.gr) == length(peaks.classified))
+  peaks.classified  
+}
+
+classified_peaks.gr <- cache("classified_peaks.gr", function() {
+  add_classification(filtered_peaks.gr)
+})
+
+```
+
+``` {r classification_counts_table, results="asis"}
+
+classified.df <- as.data.frame(classified_peaks.gr)
+
+classified.df %>% 
+  group_by(classification) %>% 
+  summarize(Count=pn(n())) %>%
+  as.data.frame %>%
+  pander
+```
+
+## DESeq
+
+Using the H3K27Ac read counts for two replicates each of Toll10b and gd7 samples, we call differentially-bound peaks using DESeq2. This results in the following numbers of peaks (adjusted p-value < 0.01):
+
+``` {r measure_k27ac_reads, include=FALSE}
+
+load_and_resize_ranges <- function(filename) {
+  rds_file <- data_path(file.path("chipseq", "rds", filename))
+  stopifnot(file.exists(rds_file))
+  readRDS(rds_file) %>% updateObject %>% resize(width=50)
+}
+
+add_k27ac_reads <- function(peaks.gr) {
+  peaks.gr <- resize(peaks.gr, width=1001, fix="center")
+
+  gd7.ranges <- mclapply(gd7.ranges, load_and_resize_ranges, mc.cores=2)
+  
+  mcols(peaks.gr)$gd7_k27ac_1 <- countOverlaps(peaks.gr, gd7.ranges[[1]], ignore.strand=TRUE)
+  mcols(peaks.gr)$gd7_k27ac_2 <- countOverlaps(peaks.gr, gd7.ranges[[2]], ignore.strand=TRUE)
+
+  rm(gd7.ranges)
+  nothing <- gc()
+
+  t10b.ranges <- mclapply(t10b.ranges, load_and_resize_ranges, mc.cores=3)
+
+  mcols(peaks.gr)$t10b_k27ac_1 <- countOverlaps(peaks.gr, t10b.ranges[[1]], ignore.strand=TRUE)
+  mcols(peaks.gr)$t10b_k27ac_2 <- countOverlaps(peaks.gr, t10b.ranges[[2]], ignore.strand=TRUE)
+  mcols(peaks.gr)$t10b_k27ac_3 <- countOverlaps(peaks.gr, t10b.ranges[[3]], ignore.strand=TRUE)
+  
+  rm(toll10b.ranges)
+  nothing <- gc()
+  
+  peaks.gr
+}
+
+k27ac_reads.gr <- cache("k27ac_reads.gr", function() {
+  add_k27ac_reads(classified_peaks.gr)
+})
+
+```
+
+``` {r run_deseq, include=FALSE}
+
+count_table_from_peaks <- function(peaks.gr) {
+  m <- as.matrix(mcols(peaks.gr)[, c("gd7_k27ac_1", "gd7_k27ac_2", "t10b_k27ac_1", "t10b_k27ac_2", "t10b_k27ac_3")])
+  rownames(m) <- mcols(peaks.gr)$name
+  m
+}
+
+run_deseq <- function(peaks.gr) {
+  counts.m <- count_table_from_peaks(peaks.gr)
+  design.df <- data.frame(row.names=colnames(counts.m), 
+                          antibody=c("lot1", "lot2", "lot1", "lot2", "lot2"),
+                          condition=c(rep("gd7",     times=length(gd7.ranges)), 
+                                      rep("toll10b", times=length(t10b.ranges))))
+  dds <- DESeqDataSetFromMatrix(countData=counts.m, colData=design.df, design = ~ antibody + condition)
+  dds$condition <- relevel(dds$condition, "gd7")
+  dds <- DESeq(dds)
+  dds
+}
+
+deseq.results <- cache('deseq.results', function() {
+  run_deseq(k27ac_reads.gr)
+})
+
+```
+
+``` {r deseq_results_table, results="asis"}
+
+annotate_deseq_results <- function(res) {
+  res$peak_id <- rownames(res)
+  rownames(res) <- NULL
+  res$status <- "No change"
+  res$status[!is.na(res$padj) & res$padj < 0.01 & res$log2FoldChange > 0] <- "Higher in Toll10b"
+  res$status[!is.na(res$padj) & res$padj < 0.01 & res$log2FoldChange < 0] <- "Higher in gd7"
+  res
+}
+
+deseq_results_df <- function(deseq.results, peaks.gr) {
+  peaks.df <- as.data.frame(peaks.gr)[, c("name", "classification")]
+  names(peaks.df)[1] <- "peak_id"
+  res <- as.data.frame(results(deseq.results))
+  res <- annotate_deseq_results(res)
+  res.merged <- merge(peaks.df, res)
+  stopifnot(nrow(peaks.df) == nrow(res))
+  res.merged
+}
+
+deseq.df <- deseq_results_df(deseq.results, k27ac_reads.gr)
+
+deseq_counts.df <- deseq.df %>%
+                   group_by(classification) %>%
+                   summarize(No_Change  = pn(sum(status == "No change")),
+                             Up_gd7     = pn(sum(status == "Higher in gd7")),
+                             Up_Toll10b = pn(sum(status == "Higher in Toll10b")))
+
+deseq.df %>%
+  group_by(status) %>%
+  summarize(count = pn(n())) %>%
+  pander("Differential regions summary")
+
+deseq_counts.df %>% as.data.frame %>% pander(caption="Differential regions by classification")
+```
+
+
+``` {r assign_known_enhancers, message=FALSE}
+
+enhancers.df <- read_csv("data/external/known_enhancers/TableS1_known_dv_enhancers_reassigned.csv") %>%
+                select(enhancer_name = name, everything())
+
+enhancers.df$activity %<>% gsub("mesoderm", "m", .) %>%
+                           gsub("dorsal ectoderm", "de", .)
+
+enhancers.gr <- makeGRangesFromDataFrame(enhancers.df, seqnames.field="chr", keep.extra=TRUE)
+
+nej.gr <- k27ac_reads.gr %>% resize(width=201, fix="center")
+
+ol <- findOverlaps(query=nej.gr, subject=enhancers.gr, ignore.strand=TRUE)
+
+mcols(nej.gr) <- mcols(nej.gr)[, c("name", "classification")]
+names(mcols(nej.gr))[1] <- "peak_id"
+
+nej.gr$known_enhancer <- "No"
+nej.gr$known_enhancer[queryHits(ol)] <- "Yes"
+
+nej.gr$known_enhancer_name <- ""
+nej.gr$known_enhancer_name[queryHits(ol)] <- enhancers.gr$enhancer_name[subjectHits(ol)]
+
+```
+
+Below is a plot of the H3K27Ac signal at each peak for the two tissues, highlighting those called significantly different by DESeq:
+
+``` {r deseq_scatterplots, fig.cap="", fig.width=9, fig.height=6, dev=c("png", "pdf")}
+
+counts.m <- counts(deseq.results, normalized=TRUE)
+counts.df <- data.frame(peak_id = rownames(counts.m), 
+                        gd7     = rowMeans(counts.m[, 1:2]),
+                        toll10b = rowMeans(counts.m[, 3:5]))
+counts.df %<>% merge(deseq.df[, c("peak_id", "status")]) %>%
+               merge(as.data.frame(nej.gr)[, c("peak_id", "classification", "known_enhancer", "known_enhancer_name")])
+
+sig_counts.df <- subset(counts.df, status != "No change")
+
+max_signal <- max(c(counts.df$toll10b, counts.df$gd7) + 1) %>% log2
+min_signal <- min(c(counts.df$toll10b, counts.df$gd7) + 1) %>% log2
+
+g <- ggplot(counts.df, aes(x=log2(toll10b + 1), y=log2(gd7 + 1), color=status)) +
+     geom_point(size=1.8, alpha=0.5) +
+     geom_abline(intercept=0, slope=1, color="black", linetype="dotted") +
+     coord_equal() +
+     scale_x_continuous(limits=c(min_signal, max_signal)) +
+     scale_y_continuous(limits=c(min_signal, max_signal)) +
+     scale_colour_manual(name   = "Significance", 
+                         guide  = guide_legend(override.aes=list(alpha=1, size=3)),
+                         values = c("No change"="gray70", 
+                                    "Higher in gd7"="#FDB040",
+                                    "Higher in Toll10b"="#49529D")) +
+     labs(x="Normalized Toll10b H3K27Ac signal (log2)", 
+          y="Normalized gd7 H3K27Ac signal (log2)",
+          title="DESeq results") +
+     theme_bw() +
+     theme(panel.grid.minor=element_blank(),
+           panel.grid.major=element_blank())
+
+print(g)
+```
+
+Of the `r length(enhancers.gr)` known enhancers, `r length(unique(sig_counts.df$known_enhancer_name))` overlap a Nej-bound differential H3K27Ac region.
+
+Including only non-TSS regions, we detect differential H3K27Ac at `r length(unique(subset(sig_counts.df, classification != "TSS")$known_enhancer_name))` known enhancers.
+
+``` {r assign_diff_bound_class_to_peaks, include=FALSE}
+
+add_diff_bound_class_to_peaks <- function(peaks.gr, deseq.results) {
+  deseq.df <- as.data.frame(results(deseq.results))
+  deseq.df <- annotate_deseq_results(deseq.df)
+  mcols(peaks.gr)$diff_bound_class <- deseq.df$status[match(mcols(peaks.gr)$name, deseq.df$peak_id)]
+  mcols(peaks.gr)$diff_bound_pvalue <- deseq.df$padj[match(mcols(peaks.gr)$name, deseq.df$peak_id)]
+
+  # Replace K27Ac counts with DESeq normalized counts
+  counts.df <- as.data.frame(counts(deseq.results, normalized=TRUE))
+  counts.df$peak_id <- rownames(counts.df)
+  rownames(counts.df) <- NULL
+
+  mcols(peaks.gr)$gd7_k27ac_1 <- counts.df$gd7_k27ac_1[match(mcols(peaks.gr)$name, counts.df$peak_id)]
+  mcols(peaks.gr)$gd7_k27ac_2 <- counts.df$gd7_k27ac_2[match(mcols(peaks.gr)$name, counts.df$peak_id)]
+
+  mcols(peaks.gr)$t10b_k27ac_1 <- counts.df$t10b_k27ac_1[match(mcols(peaks.gr)$name, counts.df$peak_id)]
+  mcols(peaks.gr)$t10b_k27ac_2 <- counts.df$t10b_k27ac_2[match(mcols(peaks.gr)$name, counts.df$peak_id)]
+  mcols(peaks.gr)$t10b_k27ac_3 <- counts.df$t10b_k27ac_3[match(mcols(peaks.gr)$name, counts.df$peak_id)]
+
+  peaks.gr
+}
+
+final_peaks.gr <- cache("final_peaks.gr", function() {
+  gr <- add_diff_bound_class_to_peaks(k27ac_reads.gr, deseq.results)
+  resize(gr, width=201, fix="center")
+})
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

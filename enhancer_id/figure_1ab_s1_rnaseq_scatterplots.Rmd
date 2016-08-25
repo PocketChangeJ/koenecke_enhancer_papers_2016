@@ -1,0 +1,215 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(ggrepel)
+library(dplyr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_1ab_s1_rnaseq_scatterplots")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/flybase.r")
+source("shared_code/known_enhancers.r")
+source("shared_code/ggplot_theme.r")
+source("shared_code/rnaseq.r")
+```
+
+# Figure 2: RNA-seq plots
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r load_data}
+
+rnaseq.df <- rnaseq_diff_exp_results() %>%
+             filter(sample_1 == "gd" & sample_2 == "toll")
+
+# Add CG8788 as a duplicate of CG44286, a gene with identical transcript coordinates
+row.df <- subset(rnaseq.df, fb_symbol == "CG44286")
+row.df$fb_symbol <- "CG8788"
+row.df$fb_gene_id <- "FBgn0028955"
+rnaseq.df %<>% bind_rows(row.df)
+
+```
+
+## Panel A: RNA-seq tissue scatterplot
+
+``` {r build_rnaseq_tissue_scatterplot}
+
+activity_colors <- c("m"="#4B549B", "de"="#FAB049")
+
+genes <- subset(enhancers.df, gene_name != "Unknown")$gene_name %>% unique
+
+rnaseq.df <- subset(rnaseq.df, fb_symbol %in% genes)[, c("fb_symbol", "RPKM_1", "RPKM_2")]
+names(rnaseq.df) <- c("gene_name", "FPKM.de", "FPKM.m")
+
+rnaseq.df <- merge(rnaseq.df, enhancers.df[, c("gene_name", "activity")]) %>% unique
+rnaseq.df$activity <- factor(rnaseq.df$activity, levels=c("m", "de"))
+
+scale_breaks <- c(-6, -3, 0, 3, 6, 9)
+
+min_scale <- c(rnaseq.df$FPKM.de, rnaseq.df$FPKM.m) %>% log2
+min_scale <- min_scale[is.finite(min_scale)] %>% min
+max_scale <- c(rnaseq.df$FPKM.de, rnaseq.df$FPKM.m) %>% log2 %>% max
+
+rnaseq.df %<>% filter(FPKM.de > 0 & FPKM.m > 0)
+
+g <- ggplot(rnaseq.df, aes(x=log2(FPKM.de), y=log2(FPKM.m), color=activity)) +
+     geom_point(size=2) +
+     geom_text_repel(aes(label=gene_name), size=4, show.legend=FALSE) +
+     scale_color_manual("Genes active in", values=activity_colors) +
+     scale_x_continuous(limits=c(min_scale, max_scale), breaks=scale_breaks) +
+     scale_y_continuous(limits=c(min_scale, max_scale), breaks=scale_breaks) +
+     theme_manuscript() +
+     labs(x="\nmRNA levels in gd7\n(log2 FPKM)", y="mRNA levels in Toll10b\n(log2 FPKM)\n")
+
+```
+
+``` {r display_rnaseq_tissue_scatterplot, fig.width=7, fig.height=7, dev=c("png", "pdf")}
+g
+```
+
+## Panel B: RNA-seq fold change boxplots
+
+``` {r build_rnaseq_fold_change_boxplots}
+
+rnaseq.df <- transform(rnaseq.df, fold_change_fpkm = log2(FPKM.m / FPKM.de))
+
+g <- ggplot(rnaseq.df, aes(x="", y=fold_change_fpkm, fill=activity)) +
+     geom_boxplot() +
+     scale_fill_manual("Genes active in", values=activity_colors) +
+     labs(x="", y="mRNA fold change Toll10b vs gd7\n") +
+     theme_manuscript()
+
+```
+
+``` {r display_rnaseq_fold_change_boxplots, fig.width=3, fig.height=5, dev=c("png", "pdf")}
+g
+```
+
+``` {r rnaseq_fold_change_statistics}
+
+w.test <- with(rnaseq.df, wilcox.test(x = fold_change_fpkm[activity == "m"], 
+                                      y = fold_change_fpkm[activity == "de"],
+                                      alternative = "two.sided",
+                                      paired = FALSE))
+
+data_frame(Test="Mesoderm vs Dorsal ectoderm", wilcox_pvalue=w.test$p.value) %>% pander
+```
+
+## Panel C: RNA-seq vs H3K27Ac scatterplot (gd7)
+
+``` {r build_rnaseq_k27ac_scatterplot_gd7}
+
+enrichments.df <- readRDS("../poised_enhancers/calculate_enrichments_at_known_enhancers/enrichments.df.rds")
+
+k27ac.df <- enrichment_values(tissue="de", factor="h3k27ac", replicate="best", enrichments.df)
+
+k27ac.df <- merge(k27ac.df, enhancers.df[, c("enhancer_name", "gene_name")]) %>%
+            merge(rnaseq.df)
+
+model <- lm(log2(FPKM.de) ~ log2(enrichment), data=k27ac.df)
+cor   <- cor(log2(k27ac.df$FPKM.de), log2(k27ac.df$enrichment), method="pearson")^2
+
+ab_intercept <- coefficients(model)[1]
+ab_slope     <- coefficients(model)[2]
+
+g <- ggplot(k27ac.df, aes(x=log2(enrichment), y=log2(FPKM.de), color=activity)) +
+     annotate("text", x=-Inf, y=Inf, vjust=1, hjust=-1, label=round(cor, 2)) +
+     geom_abline(intercept=ab_intercept, slope=ab_slope, color="gray80") +
+     geom_point() +
+     theme_manuscript() +
+     labs(x="\nNormalized H3K27ac enrichment\nover input in gd7 (log2)", y="mRNA levels in gd7\n(log2 of FPKM)\n") +
+     scale_color_manual("Enhancer type", values=activity_colors) 
+     
+```
+
+``` {r display_rnaseq_k27ac_scatterplot_gd7, dev=c("png", "pdf")}
+g
+g + geom_text_repel(aes(label=gene_name), size=4, show.legend=FALSE)
+```
+
+## RNA-seq vs H3K27Ac scatterplot (Toll10b)
+
+``` {r build_rnaseq_k27ac_scatterplot_toll10b}
+
+k27ac.df <- enrichment_values(tissue="m", factor="h3k27ac", replicate="best", enrichments.df)
+
+k27ac.df <- merge(k27ac.df, enhancers.df[, c("enhancer_name", "gene_name")]) %>%
+            merge(rnaseq.df)
+
+model <- lm(log2(FPKM.m) ~ log2(enrichment), data=k27ac.df)
+cor   <- cor(log2(k27ac.df$FPKM.m), log2(k27ac.df$enrichment), method="pearson")^2
+
+ab_intercept <- coefficients(model)[1]
+ab_slope     <- coefficients(model)[2]
+
+g <- ggplot(k27ac.df, aes(x=log2(enrichment), y=log2(FPKM.m), color=activity)) +
+     annotate("text", x=-Inf, y=Inf, vjust=1, hjust=-1, label=round(cor, 2)) +
+     geom_abline(intercept=ab_intercept, slope=ab_slope, color="gray80") +
+     geom_point() +
+     theme_manuscript() +
+     labs(x="\nNormalized H3K27ac enrichment\nover input in Toll10b (log2)", y="mRNA levels in Toll10b\n(log2 of FPKM)\n") +
+     scale_color_manual("Enhancer type", values=activity_colors) 
+     
+```
+
+``` {r display_rnaseq_k27ac_scatterplot_toll10b, dev=c("png", "pdf")}
+g
+g + geom_text_repel(aes(label=gene_name), size=4, show.legend=FALSE)
+```
+
+
+## Panel D: RNA-seq fold change vs H3K27Ac fold change scatterplot
+
+``` {r build_relative_rnaseq_k27ac_scatterplot}
+
+k27ac.m  <- enrichment_values(tissue="m",  factor="h3k27ac", replicate="best", enrichments.df)
+k27ac.de <- enrichment_values(tissue="de", factor="h3k27ac", replicate="best", enrichments.df)
+
+names(k27ac.m)[which(names(k27ac.m) == "enrichment")] <- "enrichment.m"
+names(k27ac.de)[which(names(k27ac.de) == "enrichment")] <- "enrichment.de"
+
+k27ac.df <- merge(k27ac.m[, c("enhancer_name", "enrichment.m")],
+                  k27ac.de[, c("enhancer_name", "enrichment.de")])
+
+k27ac.df <- merge(k27ac.df, 
+                  subset(enhancers.df, gene_name != "Unknown")[, c("enhancer_name", "gene_name")])
+
+k27ac.df <- merge(k27ac.df, rnaseq.df)
+k27ac.df <- transform(k27ac.df, fold_change_k27ac = log2(enrichment.m / enrichment.de))
+
+# apply log2 fold change correction factor
+
+corrections.df <- readRDS("../poised_enhancers/calculate_histone_normalization_factors/medians.df.rds")
+correction_factor <- subset(corrections.df, factor == "h3k27ac")$median_log2_fold_change
+
+k27ac.df <- transform(k27ac.df, fold_change_k27ac = fold_change_k27ac - correction_factor)
+
+k27ac.df <- subset(k27ac.df, is.finite(fold_change_fpkm) & is.finite(fold_change_k27ac))
+
+model <- lm(fold_change_fpkm ~ fold_change_k27ac, data=k27ac.df)
+cor   <- cor(k27ac.df$fold_change_fpkm, k27ac.df$fold_change_k27ac, method="pearson")^2
+
+ab_intercept <- coefficients(model)[1]
+ab_slope     <- coefficients(model)[2]
+
+g <- ggplot(k27ac.df, aes(x=fold_change_k27ac, y=fold_change_fpkm, color=activity)) +
+     annotate("text", x=-Inf, y=Inf, vjust=1, hjust=-1, label=round(cor, 2)) +
+     geom_abline(intercept=ab_intercept, slope=ab_slope, color="gray80") +
+     geom_segment(inherit.aes=FALSE, x=0, xend=0, y=-Inf, yend=0, color="gray80") +
+     geom_segment(inherit.aes=FALSE, x=-Inf, xend=0, y=0, yend=0, color="gray80") +
+     geom_point() +
+     theme_manuscript() +
+     labs(x="\nNormalized H3K27ac enrichment\nover input Toll10b vs gd7 (log2 fold change)", y="mRNA levels Toll10b vs gd7\n(log2 fold change)\n") +
+     scale_color_manual("Enhancer type", values=activity_colors) 
+```
+
+``` {r display_relative_rnaseq_k27ac_scatterplot, dev=c("png", "pdf")}
+g
+g + geom_text_repel(aes(label=gene_name), size=4, show.legend=FALSE)
+```
+
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

@@ -1,0 +1,254 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(dplyr)
+library(magrittr)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+library(ggplot2)
+library(stringr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_s5_atac_enhancers_motif_enrichment")
+
+set.seed(12345)
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/flybase.r")
+source("shared_code/motif_enrichments.r")
+source("shared_code/motif_conservation.r")
+source("shared_code/motif_overlaps.r")
+source("shared_code/seq_logo.r")
+source("shared_code/rnaseq.r")
+source("shared_code/ggplot_theme.r")
+source("shared_code/stat_tests.r")
+```
+
+# Figure S5: ATAC enhancers known motif enrichment analysis
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r data_paths, include=FALSE}
+
+motif_granges_path <- function() {
+ data_path("fimo/granges") 
+}
+
+source_peaks <- function() {
+  readRDS("figure_s3a_atac_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>%
+    resize(width=201, fix="center") %>%
+    subset(classification != "TSS")
+}
+
+pv_cutoff <- function() {
+  return(0.05)
+}
+
+cores <- function() {
+  return(7)
+}
+
+transcription_factor_fpkm_expression_threshold <- 3
+
+```
+
+## Region counts
+
+``` {r region_counts_table}
+
+source_peaks() %>%
+  as.data.frame %>%
+  group_by(diff_bound_class) %>%
+  summarize(count = n()) %>%
+  pander
+
+```
+
+## Assign FlyBase gene IDs to known motifs
+
+``` {r match_motifs}
+motif_ids.df <- match_motifs_to_fb_genes(list.files(motif_granges_path(), ".granges.rds$"))
+```
+
+## Calculate enrichments
+
+We can now test for enrichment of known motifs using the results from DESeq. We will use an adjusted p-value cutoff of `r pv_cutoff()`. Each Nejire peak has been resized to 201 bp centered on the Nejire ChIP-seq summit.
+
+We do not test the following motifs:
+
+  - All JASPAR\_CORE motifs, as they are duplicates of JASPAR\_2014
+  - All daughterless (da) hetereodimer motifs
+  - All motifs where the corresponding transcription factor is not expressed in any of the three tissues (FPKM > 5)
+
+``` {r motif_enrichments, include=FALSE}
+
+motif_results <- function(peaks.gr, motifs) {
+  f.gd7 <- subset(peaks.gr, diff_bound_class == "Higher in gd7")
+  f.tol <- subset(peaks.gr, diff_bound_class == "Higher in Toll10b")
+  f.nc  <- subset(peaks.gr, diff_bound_class == "No change")
+
+  counts.gd7 <- motif_counts_rds(f.gd7, motifs, cores=cores())
+  counts.tol <- motif_counts_rds(f.tol, motifs, cores=cores())
+  counts.nc  <- motif_counts_rds(f.nc,  motifs, cores=cores())
+
+  gd7.results <- motif_count_comparison(counts.gd7, counts.nc)
+  gd7.results$diff_bound_class <- "Higher in gd7"
+  
+  tol.results <- motif_count_comparison(counts.tol, counts.nc)
+  tol.results$diff_bound_class <- "Higher in Toll10b"
+
+  direct.results <- motif_count_comparison(counts.gd7, counts.tol)
+  direct.results$diff_bound_class <- "gd7 vs Toll10b"
+  
+  results.df <- bind_rows(gd7.results, tol.results, direct.results)
+  results.df
+}
+
+motifs <- list.files(motif_granges_path(), "\\.granges\\.rds$", full.names=TRUE)
+names(motifs) <- gsub("\\.granges\\.rds$", "", basename(motifs))
+
+expressed_genes <- genes_expressed_in_tissue(c("gd", "toll"), fpkm_threshold=transcription_factor_fpkm_expression_threshold)
+
+test_motifs <- subset(motif_ids.df, motif %in% names(motifs) & motif_fb_id %in% expressed_genes)$motif
+
+motifs <- motifs[names(motifs) %in% test_motifs]
+motifs <- motifs[-grep("^JASPAR_CORE", names(motifs))]
+motifs <- motifs[-grep("_da_", names(motifs))]
+motifs <- motifs[-grep("tgo_", names(motifs))]
+
+motif_results.df <- cache("motif_results.df", function() {
+
+  peaks.gr <- source_peaks()
+  
+  results <- motif_results(peaks.gr, motifs)
+  results
+})
+
+```
+
+This results in `r length(motifs)` tested motifs.
+
+``` {r process_motif_enrichments, include=FALSE}
+
+preprocess_motif_results <- function(motif_results.all) {
+  motif_results.all$enrichment[is.infinite(motif_results.all$enrichment)] <- 1
+  motif_results.all$enrichment[motif_results.all$enrichment == 0] <- 1
+  motif_results.all$enrichment[is.na(motif_results.all$enrichment)] <- 1
+  motif_results.all
+}
+
+results.df <- preprocess_motif_results(motif_results.df)
+
+results.df$group_label <- results.df$diff_bound_class
+results.df <- merge(results.df, motif_ids.df, all.x=TRUE)
+
+results.df$adj_pv <- p.adjust(results.df$pvalue, method="BH")
+
+saveRDS(results.df, file=figure_path("filtered_results.df.rds"))
+```
+
+After removal, we calculate an adjusted p-value for each motif enrichment test.
+
+## Calculate overlap values for pairs of significant motifs
+
+``` {r calculate_overlaps, message=FALSE}
+
+sig_motifs <- c(subset(results.df, adj_pv < pv_cutoff() & diff_bound_class == "gd7 vs Toll10b")$motif,
+                subset(results.df, adj_pv < pv_cutoff() & test_type == "enrichment")$motif) %>% unique
+
+differential_peaks.gr <- subset(source_peaks(), diff_bound_class != "No change")
+
+overlaps.df <- cache("overlaps.df", function() {
+  overlap_table_for_motifs(sig_motifs, differential_peaks.gr)
+})
+
+```
+
+We next calculate the overlap between all pairs of `r length(sig_motifs)` significant motifs.
+
+## Enrichment and overlap heat maps
+
+``` {r build_heatmaps_and_display_overlap_tables, message=FALSE}
+
+overlap_percent <- 10
+
+overlaps.df$overlap <- pmax(overlaps.df$m1_percent, overlaps.df$m2_percent)
+
+include_motifs <- sig_motifs #subset(results.df, adj_pv < pv_cutoff())$motif
+sig.df <- subset(results.df, motif %in% include_motifs)
+
+sig.overlap <- group_by_overlap(sig.df, overlaps.df, percent=overlap_percent)
+
+sig.overlap$df$other_names %<>% gsub(", ", "<br>", .)
+sig.overlap$df %>% pander(caption="Motif overlap table")
+
+saveRDS(sig.overlap, file=figure_path("motifs_grouped_by_overlap.df.rds"))
+
+sig.df <- sig.overlap$filtered
+
+sig_motifs <- sig.df$motif %>% unique
+
+g <- clustered_motif_heatmap(sig.df, "Differential H3K27ac at ATAC regions")
+motif_order <- rev(levels(g$data$motif))
+g <- clustered_motif_heatmap(sig.df, "Differential H3K27ac at ATAC regions", motif.order=motif_order)
+```
+
+Motif pairs with more than `r overlap_percent`% overlapping instances are combined, selecting the motif with the best p-value.
+
+``` {r show_motif_enrichment_heatmaps_inline, eval=TRUE, fig.cap="", fig.width=8, fig.height=8, dev=c("png", "pdf")}
+g
+```
+
+``` {r show_motif_overlap_heatmaps_inline, eval=TRUE, fig.cap="", fig.width=14, fig.height=10, dev=c("png", "pdf")}
+
+overlap_heatmap.df <- subset(overlaps.df, motif1 %in% sig.df$motif & motif2 %in% sig.df$motif)
+overlap_heatmap.df$motif1 %<>% factor(levels=levels(g$data$motif))
+overlap_heatmap.df$motif2 %<>% factor(levels=levels(g$data$motif))
+
+overlap_heatmap.df2 <- overlap_heatmap.df
+names(overlap_heatmap.df2)[1:2] <- c("motif2", "motif1")
+overlap_heatmap.df %<>% bind_rows(overlap_heatmap.df2)
+
+g_overlaps <- ggplot(overlap_heatmap.df, aes(x=motif1, y=motif2, fill=overlap)) +
+              geom_tile() +
+              geom_text(aes(label=as.integer(overlap)), color="black") +
+              scale_y_discrete(expand=c(0, 0)) +
+              scale_x_discrete(expand=c(0, 0)) +
+              scale_fill_gradient(name="Overlap%", high="red", low="white", limits=c(0, 100)) +
+              labs(x="", y="", title="Overlapping motif instances") +
+              theme_bw() +
+              theme(axis.text.x=element_text(angle=45, hjust=1, vjust=1),
+                    axis.text.y=element_text(hjust=1),
+                    panel.grid.minor=element_blank(),
+                    panel.grid.major=element_blank(),
+                    axis.line=element_blank(),
+                    axis.ticks=element_line(size = 0.5, color="gray50"))
+              
+g_overlaps
+```
+
+## Individual motifs
+
+A PDF of motif logos for all significant motifs has been generated in the output folder for this document.
+
+``` {r show_motifs, eval=TRUE, include=FALSE}
+
+print_genome_motif <- function(motif_name) {
+  motifs.gr <- load_motif(motif_name)
+
+  if(length(motifs.gr) > 5000) motifs.gr <- sample(motifs.gr, 5000)
+  motifs.seq <- getSeq(Dmelanogaster, motifs.gr)
+  m <- consensusMatrix(motifs.seq)[1:4, ]
+  grid.newpage()
+  seqLogoGrid2(m / colSums(m), title=paste0("Genome: ", motif_name))
+}
+
+motifs <- unique(include_motifs)
+
+pdf(figure_path("significant_motif_logos.pdf"), width=6, height=4)
+nothing <- lapply(motifs, print_genome_motif)
+dev.off()
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

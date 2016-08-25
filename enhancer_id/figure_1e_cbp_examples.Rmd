@@ -1,0 +1,166 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(TxDb.Dmelanogaster.UCSC.dm3.ensGene)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+library(rtracklayer)
+library(magrittr)
+library(dplyr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_1e_cbp_examples")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/gviz.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Single region examples
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r bigwigs}
+
+# "data/internal/chipseq/rpm/tl10b_h3k27ac_3_rpm.bw",
+# "data/internal/chipseq/rpm/gd7_h3k27ac_1_rpm.bw"
+
+bigwigs.rpm <- list("Meso K27Ac"=data_path("chipseq/bigwigs/enrichment/tl10b_h3k27ac_1_501bp_linear_enrichment.bw"),  
+                    "DE K27Ac"=data_path("chipseq/bigwigs/enrichment/gd7_h3k27ac_1_501bp_linear_enrichment.bw"),
+                    "Nejire"=data_path("chipseq/bigwigs/rpm/orer_nej_1_rpm.bw"))
+                    
+colors <- list("Meso K27Ac"="#49539E",
+               "DE K27Ac"="#FCB13C",
+               "Nejire"="#808080")
+               
+enhancers.gr <- readRDS("09_build_spreadsheets/enhancer_list.df.rds") %>%
+                select(name, chr, start, end) %>%
+                makeGRangesFromDataFrame(seqnames.field="chr", keep.extra=TRUE)
+
+e_regions.gr <- resize(enhancers.gr, width=5000, fix="center")
+```
+
+``` {r common}
+
+build_track <- function(factor_name, bigwigs, region.gr, factor_colors, max_value=NA) {
+  if(is.na(max_value)) max_value = max_value(bigwigs[[factor_name]], region.gr)
+  
+  gviz_data_track(bigwigs[[factor_name]], factor_name, factor_colors[[factor_name]], max_value)
+}
+
+plot_region <- function(region.gr, bws, track_colors, enhancers.gr) {
+  stopifnot(length(region.gr) == 1)
+  
+  #region.gr <- resize(region.gr, width(region.gr) + 12000*2, fix="center")
+  
+  r_chr <- as.character(seqnames(region.gr))
+  r_start <- start(region.gr)
+  r_end   <- end(region.gr)
+  
+  grtrack <- GeneRegionTrack(range=TxDb.Dmelanogaster.UCSC.dm3.ensGene,
+                             genome="dm3",
+                             chromosome=r_chr,
+                             name="Genes",
+                             showId=FALSE,
+                             geneSymbol=TRUE,
+                             fill="black", collapseTranscripts=FALSE)
+  
+  max_enrichments <- bws %>% 
+                     checked_mclapply(max_value, region.gr, mc.cores=6, mc.preschedule=FALSE) %>%
+                     unlist
+
+  max_e_all     <- max_enrichments %>% max %>% ceiling
+  max_e_histone <- max_enrichments[1:2] %>% max %>% ceiling
+  
+  e.gr <- enhancers.gr[seqnames(enhancers.gr) == r_chr]
+  e.gr$feature <- "enhancer"
+  e.gr$id <- e.gr$name
+  enhancers_track <- AnnotationTrack(range=e.gr, strand=rep("*", length(e.gr)),
+                                     genome="dm3", name="Enhancers", showFeatureId=TRUE,
+                                     stacking="dense", fill="black", fontcolor="black", fontcolor.group="black", fontsize=5)
+  
+  datatracks_histones <- names(bws)[1:2] %>%
+                         lapply(build_track, bws, region.gr, track_colors, max_e_histone)
+
+  datatracks_other <- names(bws)[3:length(bws)] %>%
+                      lapply(build_track, bws, region.gr, track_colors)
+
+  datatracks <- c(datatracks_histones, datatracks_other)
+
+  list(gene_track=grtrack, axis_track=GenomeAxisTrack(), data_tracks=datatracks, enhancers_track=enhancers_track, 
+       region_chr=r_chr, region_start=r_start, region_end=r_end, region_name=region.gr$name)
+}
+
+track_list <- function(track_list) {
+  c(list(track_list$axis_track), track_list$data_tracks, list(track_list$enhancers_track, track_list$gene_track))
+}
+
+```
+
+``` {r build_figures}
+
+regions_to_granges <- function(regions) {
+  chrs <- gsub("^(.*):.*$", "\\1", regions)
+  starts <- gsub("^.*:(.*)-.*$", "\\1", regions) %>% gsub(",", "", .) %>% as.integer
+  ends <- gsub("^.*:.*-(.*)$", "\\1", regions) %>% gsub(",", "", .) %>% as.integer
+
+  GRanges(ranges=IRanges(starts, ends), seqnames=chrs, name=regions)
+}
+
+named_regions_to_granges <- function(regions) {
+  gr <- subset(e_regions.gr, name %in% .(regions))
+  stopifnot(length(gr) == length(regions))
+  gr
+}
+
+de_regions.gr <- named_regions_to_granges("C15-DEE2")
+#m_regions.gr <-  regions_to_granges("chr3R:26,573,500-26,578,500")
+m_regions.gr <- named_regions_to_granges("zfh1-ME2")
+
+plots_de <- seq_along(de_regions.gr) %>%
+              lapply(function(i) {
+                plot_region(de_regions.gr[i], bigwigs.rpm, colors, enhancers.gr)
+              })
+
+plots_m <- seq_along(m_regions.gr) %>%
+              lapply(function(i) {
+                plot_region(m_regions.gr[i], bigwigs.rpm, colors, enhancers.gr)
+              })
+
+```
+
+## Mesoderm
+
+``` {r display_meso_figures, fig.width=28, fig.height=28, dev=c("pdf")}
+
+meso <- plots_m %>%
+        lapply(function(track) {
+          plotTracks(track_list(track),
+                     sizes=c(0.2, 1, 1, 1, 0.2, 0.2),
+                     chromosome=track$region_chr,
+                     from=track$region_start,
+                     to=track$region_end,
+                     main=paste0("Mesoderm region ", track$region_name),
+                     cex.title=0.8, col.title="black", col.axis="black",
+                     fontcolor.legend="black", cex.legend=0.5) 
+        })
+```
+
+## Dorsal ectoderm
+
+``` {r display_de_figures, fig.width=28, fig.height=28, dev=c("pdf")}
+
+de <- plots_de %>%
+        lapply(function(track) {
+          plotTracks(track_list(track),
+                     sizes=c(0.2, 1, 1, 1, 0.2, 0.2),
+                     chromosome=track$region_chr,
+                     from=track$region_start,
+                     to=track$region_end,
+                     main=paste0("DE region ", track$region_name),
+                     cex.title=0.8, col.title="black", col.axis="black",
+                     fontcolor.legend="black", cex.legend=0.5) 
+        })
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

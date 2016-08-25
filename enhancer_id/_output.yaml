@@ -1,0 +1,7 @@
+html_document:
+  self_contained: true
+  theme: spacelab
+  highlight: textmate
+  toc: true
+  lib_dir: html_support
+  mathjax: null

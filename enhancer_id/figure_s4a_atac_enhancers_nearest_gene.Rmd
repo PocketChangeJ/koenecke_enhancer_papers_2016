@@ -1,0 +1,196 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_s4a_atac_enhancers_nearest_gene")
+
+set.seed(12345)
+
+source("shared_code/knitr_common.r")
+source("shared_code/rnaseq.r")
+source("shared_code/granges_common.r")
+source("shared_code/flybase.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Figure S4a: ATAC enhancers nearest gene analysis
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+``` {r load_data}
+
+cores <- function() {
+  return(8)
+}
+
+nearest_gene_fpkm_expression_threshold <- 5
+
+add_k27ac_mean_scores <- function(gr) {
+  gr.mcols <- names(mcols(gr))
+  cols.gd7 <- gr.mcols[grep("gd7_k27ac_", gr.mcols)]
+  cols.toll <- gr.mcols[grep("t10b_k27ac_", gr.mcols)]
+  
+  mcols(gr)$gd7_k27ac_score <- rowMeans(as.matrix(mcols(gr)[, cols.gd7]))
+  mcols(gr)$toll10b_k27ac_score <- rowMeans(as.matrix(mcols(gr)[, cols.toll]))
+
+  mcols(gr) <- mcols(gr)[, !names(mcols(gr)) %in% c(cols.gd7, cols.toll)]
+  gr
+}
+
+enhancers.gr <- readRDS("figure_s3a_atac_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>%
+                subset(classification != "TSS") %>%
+                add_k27ac_mean_scores
+
+mcols(enhancers.gr) <- mcols(enhancers.gr)[, c("name", "diff_bound_class", "gd7_k27ac_score", "toll10b_k27ac_score")]
+
+```
+
+``` {r define_genes}
+rnaseq.df <- rnaseq_diff_exp_results()
+
+expressed_genes <- genes_expressed_in_tissue(c("gd", "toll"), fpkm_threshold=nearest_gene_fpkm_expression_threshold)
+
+txs.gr <- flybase_txs_granges() %>%
+          subset(fb_gene_id %in% .(expressed_genes))
+
+tss.gr <- resize(txs.gr, width=1)
+
+higher_gd7.genes <- subset(rnaseq.df, sample_1 == "gd" & sample_2 == "toll" & significant & direction == "down")$fb_gene_id
+higher_toll10b.genes <- subset(rnaseq.df, sample_1 == "gd" & sample_2 == "toll" & significant & direction == "up")$fb_gene_id
+```
+
+
+``` {r nearest_dv_gene}
+
+grl <- list("No change"    = subset(enhancers.gr, diff_bound_class == "No change"),
+            "Differential" = subset(enhancers.gr, diff_bound_class != "No change"))
+
+grl[["No change"]]$diff_bound_class <- with(mcols(grl[["No change"]]), 
+                                         ifelse(gd7_k27ac_score > toll10b_k27ac_score, "Higher in gd7", "Higher in Toll10b"))
+
+data.frame(Group=names(grl),
+           Size=pn(unname(elementNROWS(grl)))) %>% pander(caption="Enhancer group sizes")
+
+
+find_nearest_tss_or_overlapping_gene <- function(gr, txs.gr) {
+  mcols(txs.gr)$distance <- distance(gr, txs.gr, ignore.strand=TRUE)
+  
+  txs_overlaps <- which(mcols(txs.gr)$distance == 0)
+  
+  if(length(txs_overlaps) > 0) {
+    gene_hit <- mcols(txs.gr)$fb_gene_id[mcols(txs.gr)$distance == 0][1]  
+    gene_dist <- 0
+  } else {
+    tss.gr <- resize(txs.gr, width=1)
+    mcols(tss.gr)$distance <- distance(gr, tss.gr, ignore.strand=TRUE)
+    tss.gr <- tss.gr[order(tss.gr$distance)]
+    gene_hit <- tss.gr$fb_gene_id[1]
+    gene_dist <- tss.gr$distance[1]
+  }
+  list(gene=gene_hit, distance=gene_dist)
+}
+
+add_nearby_tss <- function(gr, txs.gr, limit) {
+  stopifnot(length(gr) == 1)
+  txs.gr <- txs.gr[as.character(seqnames(txs.gr)) %in% as.character(seqnames(gr))]
+
+  hit1 <- find_nearest_tss_or_overlapping_gene(gr, txs.gr)
+  
+  txs.gr <- txs.gr[!mcols(txs.gr)$fb_gene_id %in% hit1$gene]
+  tss.gr <- resize(txs.gr, width=1)
+
+  mcols(tss.gr)$distance <- distance(gr, tss.gr, ignore.strand=TRUE)
+
+  tss.df <- as.data.frame(tss.gr)
+  tss.df <- arrange(tss.df, fb_gene_id, distance)
+  tss.df <- tss.df[!duplicated(tss.df$fb_gene_id), ]
+  tss.df <- arrange(tss.df, distance)[1:pmin(nrow(tss.df), limit - 1), ]
+  tss.df$distance_rank <- 1:nrow(tss.df) + 1
+  
+  data.frame(stringsAsFactors=FALSE, 
+             name=mcols(gr)$name,
+             diff_bound_class=mcols(gr)$diff_bound_class,
+             rank=c(1, tss.df$distance_rank),
+             distance=c(hit1$distance, tss.df$distance),
+             fb_gene_id=c(hit1$gene, tss.df$fb_gene_id))
+}
+
+nearest_df <- function(gr, tss.gr, limit=5) {
+  seq_along(gr) %>%
+    checked_mclapply(function(i) {
+      add_nearby_tss(gr[i], tss.gr, limit)
+    }, mc.cores=cores(), mc.preschedule=FALSE) %>%
+    bind_rows
+}
+
+nearby_gene_limit <- 3
+
+nearest.list <- cache("nearest.list", function() {
+  lapply(grl, nearest_df, txs.gr, limit=nearby_gene_limit)
+})
+
+```
+
+``` {r diff_exp_plot, dev=c("png", "pdf"), fig.cap="", fig.width=7, fig.height=5}
+
+nearest.df <- names(nearest.list) %>%
+              lapply(function(n) {
+                list.df <- nearest.list[[n]]
+                list.df$peak_group <- n
+                list.df$is_diff_exp  <- with(list.df, (diff_bound_class == "Higher in gd7"     & fb_gene_id %in% higher_gd7.genes) |
+                                                      (diff_bound_class == "Higher in Toll10b" & fb_gene_id %in% higher_toll10b.genes))
+                list.df
+              }) %>%
+              bind_rows
+
+percents.df <- nearest.df %>% 
+               group_by(peak_group, rank) %>%
+               summarize(percent_diff_exp   = sum(is_diff_exp) / length(name) * 100,
+                         diff_exp_count     = sum(is_diff_exp),
+                         non_diff_exp_count = n() - sum(is_diff_exp),
+                         n                  = n())
+
+pvalues.df <- percents.df %>%
+              group_by(rank) %>%
+              summarize(test="Differential vs No change", 
+                        pvalue=prop.test(c(diff_exp_count[peak_group == "Differential"], diff_exp_count[peak_group == "No change"]),
+                                         c(n[peak_group == "Differential"], n[peak_group == "No change"]),
+                                         alternative="greater")$p.value,
+                        obs = 100 * diff_exp_count[peak_group == "Differential"] / n[peak_group == "Differential"],
+                        exp = 100 * diff_exp_count[peak_group == "No change"] / n[peak_group == "No change"],
+                        enrichment = obs / exp)
+
+percents.df$rank %<>% as.character
+percents.df$rank %<>% factor(levels=rev(sort(unique(percents.df$rank))))
+percents.df$peak_group %<>% factor(levels=rev(c("Differential", "No change")))
+
+g <- ggplot(percents.df, aes(x=rank, y=percent_diff_exp, fill=peak_group)) +
+     geom_bar(stat="identity", position="dodge") +
+     scale_fill_manual("Enhancer group", values=c("Differential"="#840C03", "No change"="#808080")) +
+     scale_y_continuous(expand=c(0, 0), limits=c(0, NA)) +
+     coord_flip() +
+     theme_manuscript() +
+     theme(panel.grid.minor=element_blank(),
+           panel.grid.major=element_blank()) +
+     labs(x="Nearest active gene\n", 
+          y="\nPercent of peaks matched to a\ndifferentially expressed gene")
+
+g
+```
+
+``` {r percents_table}
+percents.df %>% pander
+```
+
+``` {r pvalue_table}
+pvalues.df %>% pander(caption="One-sided proportion test")
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

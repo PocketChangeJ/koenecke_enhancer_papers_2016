@@ -1,0 +1,217 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(magrittr)
+library(dplyr)
+library(tidyr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_s7_factor_binding_by_motif_analysis")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+```
+
+# Figure S7: Factor binding by motif analysis
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+``` {r load_data}
+
+enhancers.gr <- readRDS("figure_1c_cbp_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>%
+                subset(classification != "TSS" & diff_bound_class != "No change") %>%
+                resize(width=201, fix="center")
+
+mcols(enhancers.gr) <- mcols(enhancers.gr)[, "name", drop=FALSE]
+```
+
+``` {r assign_motifs}
+
+motif_granges_path <- function() {
+ data_path("fimo/granges")
+}
+
+load_motif <- function(motif_name) {
+  updateObject(readRDS(file.path(motif_granges_path(), paste0(motif_name, ".granges.rds"))))
+}
+
+annotate_motif_presence <- function(motif_name, gr) {
+  motif.gr <- load_motif(motif_name)
+  ol <- findOverlaps(query=motif.gr, subject=gr, type="within", ignore.strand=TRUE)
+  gr$tmp_column <- FALSE
+  gr$tmp_column[subjectHits(ol)] <- TRUE
+  names(mcols(gr))[which(names(mcols(gr)) == "tmp_column")] <- motif_name
+  gr
+}
+
+overlaps.df <- readRDS("figure_3a_4b_cbp_enhancers_motif_enrichment/motifs_grouped_by_overlap.df.rds")$flat
+
+motifs <- c(overlaps.df$keep_motif, overlaps.df$child_motif) %>% unique
+
+
+for(motif in motifs) {
+  enhancers.gr <- annotate_motif_presence(motif, enhancers.gr)
+}
+
+motifs.df <- as.data.frame(mcols(enhancers.gr))
+saveRDS(motifs.df, file=figure_path("motifs.df.rds"))
+
+```
+
+## ChIP-seq
+
+``` {r chipseq_enrichment_test}
+
+test_motif_chipseq <- function(motif_name, motifs.df, enrichments.df) {
+
+  with_motif <- motifs.df$name[motifs.df[, motif_name] == TRUE]
+  without_motif <- motifs.df$name[motifs.df[, motif_name] == FALSE]
+  
+  results.df <- enrichments.df$factor %>%
+                unique %>%
+                lapply(function(factor_name) {
+                  values_with    <- subset(enrichments.df, factor == factor_name & name %in% with_motif)$enrichment
+                  values_without <- subset(enrichments.df, factor == factor_name & name %in% without_motif)$enrichment
+                  
+                  wc.test <- wilcox.test(values_with, values_without, alternative="two.sided")
+  
+                  data_frame(factor_name         = factor_name,
+                             pvalue              = wc.test$p.value,
+                             with_motif_count    = length(values_with),
+                             without_motif_count = length(values_without),
+                             with_motif_mean     = mean(values_with),
+                             without_motif_mean  = mean(values_without))
+                  
+                }) %>%
+                bind_rows
+  results.df$motif <- motif_name
+  results.df
+}
+
+```
+
+``` {r build_figure_all_motifs}
+
+cluster_results <- function(results.df, cluster_method, factors_order) {
+  m.df <- spread(results.df[, c("factor_name", "motif", "neg_log_pv")], motif, neg_log_pv)
+  m <- as.matrix(m.df[, -1])
+  rownames(m) <- m.df$factor_name
+
+  factors.d <- as.dendrogram(hclust(dist(m), method=cluster_method))
+  motifs.d  <- as.dendrogram(hclust(dist(t(m)), method=cluster_method))
+
+  factors.order <- factors_order #rownames(m)[order.dendrogram(factors.d)]
+  motifs.order  <- rownames(t(m))[order.dendrogram(motifs.d)]
+
+  results.df$factor_name <- factor(results.df$factor_name, levels=factors.order)
+  results.df$motif <- factor(results.df$motif, levels=motifs.order)
+  results.df
+}
+
+enrichments.df <- readRDS("calculate_tx_factor_enrichments/enrichments.df.rds")
+
+chipseq.df <- names(motifs.df)[-1] %>%
+              lapply(test_motif_chipseq, motifs.df, enrichments.df) %>%
+              bind_rows
+
+chipseq.df$pvalue <- p.adjust(chipseq.df$pvalue, method="BH")
+chipseq.df <- transform(chipseq.df, neg_log_pv = -log10(pvalue))
+chipseq.df <- transform(chipseq.df, neg_log_pv = neg_log_pv * ifelse(with_motif_mean > without_motif_mean, 1, -1))
+chipseq.df <- transform(chipseq.df, sig_label = ifelse(pvalue < 0.01, "*", ""))
+
+results.df <- cluster_results(chipseq.df, "ward.D2", factors_order=c("Dorsal", "Twist", "Snail", "Zelda", "Mad", "Zen", "Nejire"))
+
+e.limit <- 15
+
+results.df$neg_log_pv <- pmax(-e.limit, pmin(results.df$neg_log_pv, e.limit))
+
+g <- ggplot(results.df, aes(x=factor_name, y=motif, fill=neg_log_pv)) +
+     geom_tile(color="gray70") +
+     geom_text(aes(label=sig_label)) +
+     theme_bw() +
+     scale_fill_gradientn(name="-log10 pvalue", space="Lab", 
+                          values=c(-e.limit, -1, 1, e.limit), 
+                          colours=c("darkblue", "white", "white", "darkred"), 
+                          rescaler=function(x,...) x, oob=identity,
+                          limits=c(-e.limit, e.limit), guide=guide_colorbar()) +
+    labs(x="", y="", title="Effect of motif presence on ChIP-seq enrichments") +
+    scale_x_discrete(expand=c(0, 0)) +
+    scale_y_discrete(expand=c(0, 0)) +
+    theme(axis.text.x=element_text(angle=45, hjust=1),
+          panel.grid.major=element_blank(),
+          panel.grid.minor=element_blank())
+
+```
+
+``` {r plot_figure_all_motifs, dev=c("png", "pdf"), fig.cap="", fig.width=11, fig.height=11}
+g
+```
+
+``` {r build_figure_selected_motifs}
+
+chipseq.df <- overlaps.df$keep_motif %>%
+              unique %>%
+              gsub("-", ".", .) %>%
+              lapply(test_motif_chipseq, motifs.df, enrichments.df) %>%
+              bind_rows
+
+chipseq.df$pvalue <- p.adjust(chipseq.df$pvalue, method="BH")
+chipseq.df <- transform(chipseq.df, neg_log_pv = -log10(pvalue))
+chipseq.df <- transform(chipseq.df, neg_log_pv = neg_log_pv * ifelse(with_motif_mean > without_motif_mean, 1, -1))
+chipseq.df <- transform(chipseq.df, sig_label = ifelse(pvalue < 0.01, "*", ""))
+
+results.df <- cluster_results(chipseq.df, "ward.D2", factors_order=c("Dorsal", "Twist", "Snail", "Zelda", "Mad", "Zen", "Nejire"))
+
+e.limit <- 15
+
+results.df$neg_log_pv <- pmax(-e.limit, pmin(results.df$neg_log_pv, e.limit))
+
+motif_figure_order <- c("HLH",
+                        "BEAF",
+                        "kni",
+                        "Tin",
+                        "rib",
+                        "Dll",
+                        "eve",
+                        "AbdB",
+                        "brk",
+                        "vfl",
+                        "sna",
+                        "CG16778",
+                        "dl")
+
+all_motifs <- results.df$motif %>% unique
+
+motifs <- lapply(motif_figure_order, function(m) {
+            all_motifs[grep(m, all_motifs)[1]]
+          }) %>%
+          unlist
+
+results.df$motif <- factor(results.df$motif, levels=rev(motifs))
+
+g <- ggplot(results.df, aes(x=factor_name, y=motif, fill=neg_log_pv)) +
+     geom_tile(color="gray70") +
+     geom_text(aes(label=sig_label)) +
+     theme_bw() +
+     scale_fill_gradientn(name="-log10 pvalue", space="Lab", 
+                          values=c(-e.limit, -1, 1, e.limit), 
+                          colours=c("darkblue", "white", "white", "darkred"), 
+                          rescaler=function(x,...) x, oob=identity,
+                          limits=c(-e.limit, e.limit), guide=guide_colorbar()) +
+    labs(x="", y="", title="Effect of motif presence on ChIP-seq enrichments") +
+    scale_x_discrete(expand=c(0, 0)) +
+    scale_y_discrete(expand=c(0, 0)) +
+    theme(axis.text.x=element_text(angle=45, hjust=1),
+          panel.grid.major=element_blank(),
+          panel.grid.minor=element_blank())
+
+```
+
+``` {r plot_figure_selected_motifs, dev=c("png", "pdf"), fig.cap="", fig.width=11, fig.height=6}
+g
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

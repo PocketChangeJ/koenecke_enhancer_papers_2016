@@ -1,0 +1,95 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE}
+library(GenomicRanges)
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+library(readr)
+
+# Output folder for this document
+options(knitr.figure_dir = "cbp_and_atac_detection_of_known_enhancers_comparison")
+
+set.seed(12345)
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+```
+
+# Known enhancers: Nej (CBP) vs ATAC differential H3K27ac
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r load_data}
+
+nej.gr <- readRDS("figure_1c_cbp_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>% updateObject
+atac.gr <- readRDS("figure_s4a_atac_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>% updateObject
+
+enhancers.df <- read_csv("data/external/known_enhancers/TableS1_known_dv_enhancers_reassigned.csv") %>%
+                select(enhancer_name = name, everything())
+
+enhancers.df$activity %<>% gsub("mesoderm", "m", .) %>%
+                           gsub("dorsal ectoderm", "de", .)
+
+enhancers.gr <- makeGRangesFromDataFrame(enhancers.df, seqnames.field="chr", keep.extra=TRUE)
+
+annotate_known_enhancers <- function(gr, enhancers.gr) {
+  ol <- findOverlaps(query=gr, subject=enhancers.gr, ignore.strand=TRUE)
+  
+  gr$overlaps_known <- "No"
+  gr$overlaps_known[queryHits(ol)] <- "Yes"
+  
+  gr$known_name <- ""
+  gr$known_name[queryHits(ol)] <- enhancers.gr$enhancer_name[subjectHits(ol)]
+  gr
+}
+
+nej.gr %<>% annotate_known_enhancers(enhancers.gr)
+atac.gr %<>% annotate_known_enhancers(enhancers.gr)
+```
+
+## Total tested peaks
+
+```{r total_peaks}
+
+counts.df <- list("Nej-based"=nej.gr, 
+                  "ATAC-based"=atac.gr) %>%
+             lapply(as.data.frame) %>%
+             bind_rows(.id="Peaks") %>%
+             group_by(Peaks) %>%
+             summarize(Total = pn(n()), 
+                       Differential = pn(sum(diff_bound_class != "No change")),
+                       NonTSS_Total = pn(sum(classification != "TSS")),
+                       NonTSS_Differential = pn(sum(classification != "TSS" & diff_bound_class != "No change")))
+
+counts.df %>% pander
+
+
+summary.df <- data_frame(Enhancer = enhancers.gr$enhancer_name,
+                         Has_Nej_peak = yesno(enhancers.gr$enhancer_name %in% nej.gr$known_name),
+                         Has_ATAC_peak = yesno(enhancers.gr$enhancer_name %in% atac.gr$known_name)) %>%
+             arrange(Enhancer)
+
+```
+
+## Overlap with known enhancers
+
+```{r known_enhancers}
+
+summary.df %>% summarize(Total_Known = length(enhancers.gr),
+                         With_ATAC_peak=sum(Has_ATAC_peak == "Yes"),
+                         ATAC_differential=sum(enhancers.gr$enhancer_name %in% subset(atac.gr, diff_bound_class != "No change")$known_name)) %>%
+               pander
+
+summary.df %>% summarize(Total_Known = length(enhancers.gr),
+                         With_Nej_peak=sum(Has_Nej_peak == "Yes"),
+                         Nej_differential=sum(enhancers.gr$enhancer_name %in% subset(nej.gr, diff_bound_class != "No change")$known_name)) %>%
+               pander
+
+
+summary.df %>% pander(emphasize.strong.rows=which(summary.df$Has_Nej_peak == "No" | 
+                                                  summary.df$Has_ATAC_peak == "No"))
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

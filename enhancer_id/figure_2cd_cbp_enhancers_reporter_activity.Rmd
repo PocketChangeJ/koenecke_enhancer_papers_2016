@@ -1,0 +1,193 @@
+```{r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_2cd_cbp_enhancers_reporter_activity")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/vienna_tiles.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Figure 2c and 2d: CBP enhancers reporter activity
+
+```{r header_child, child="child_docs/header_child.Rmd"}
+
+```
+
+## Overview
+
+```{r load_data}
+
+groups.list <- readRDS("figure_2b_cbp_nearest_gene_comparison/nearest_gene_groups.list.rds")
+
+colors <- c("Putative mesoderm"="#49539E",
+            "Putative dorsal ectoderm"="#FCB13C",
+            "DTS ChIP-chip"="#67913F",
+            "Dorsal"="#A2BC71",
+            "Twist"="#02743E",
+            "Mad"="#CBAB6A",
+            "Zen"="#DBCE9B",
+            "Non-differential CBP"="#808080",
+            "All CBP"="#808080",
+            "All ATAC"="#808080",
+            "Early expressed VTs"="#808080",
+            "All VT tiles"="#808080")
+            #"Random"="#808080")
+
+groups.list <- groups.list[names(groups.list) %in% names(colors)]
+
+```
+
+``` {r summarize_vts_by_stage, fig.cap="", fig.width=7, fig.height=5, dev=c("png", "pdf")}
+
+select_overlapping_vts <- function(gr, tiles.gr) {
+  ol <- findOverlaps(query=gr, subject=tiles.gr, ignore.strand=TRUE)
+  gr_tiles <- tiles.gr[subjectHits(ol)] %>% unique
+  gr_tiles
+}
+
+vt_percent_plot <- function(data_df, title, group_order=c(), reversed=FALSE, max_scale=100, scale_breaks) {
+  data_df %<>% mutate(significance = ifelse(pvalue < 0.05, "*", ""))
+  
+  if(reversed)
+    data_df$significance <- paste0(data_df$significance, "  ")
+  else
+    data_df$significance <- paste0("  ", data_df$significance)
+  
+  if(length(group_order) > 0) data_df$group_name <- factor(data_df$group_name, levels=rev(group_order))
+  g <- ggplot(data_df, aes(x=group_name, y=percent, fill=group_name)) +
+       geom_bar(position="identity", stat="identity")
+  if(reversed) {
+    g <- g + scale_y_reverse(expand=c(0, 0), limits=c(max_scale, 0), breaks=scale_breaks)
+  } else {
+    g <- g + scale_y_continuous(expand=c(0, 0), limits=c(0, max_scale), breaks=scale_breaks)
+  }
+  g <- g +     
+       scale_fill_manual("", values=colors, guide="none") +
+       geom_text(aes(label=significance), size=6) +
+       coord_flip() +
+       theme_manuscript() +
+       theme(axis.text.y=element_text(hjust=1)) +
+       labs(y="Percent", x="", title=paste0(title, "\n"))
+  g
+}
+
+tiles_by_stage <- function(grl, stages) {
+  grl %>%
+    lapply(function(gr) {
+      gr_tiles <- gr$VTID %>% unique
+      stage_tiles <- subset(vt.df, stage %in% stages)$VTID %>% unique
+      
+      data.frame(stringsAsFactors = FALSE,
+                 stages           = paste(stages, collapse=", "),
+                 tiles            = length(gr_tiles),
+                 tiles_in_stage   = length(intersect(gr_tiles, stage_tiles)),
+                 percent          = length(intersect(gr_tiles, stage_tiles)) / length(gr_tiles) * 100)
+    }) %>%
+    bind_rows(.id="group_name")
+}
+
+bystage.grl <- groups.list %>%
+               lapply(select_overlapping_vts, all_tiles.gr) %>%
+               c(list("All VT tiles"=all_tiles.gr))
+
+early_stages <- c("stg4_6", "stg7_8", "stg9_10")
+
+stage_pvalue_for_group <- function(group, data.df, compare_to) {
+  successes <- c(subset(data.df, group_name == group)$tiles_in_stage[1],
+                 subset(data.df, group_name == compare_to)$tiles_in_stage[1])
+  totals <- c(subset(data.df, group_name == group)$tiles[1],
+              subset(data.df, group_name == compare_to)$tiles[1])
+  
+  prop.test(successes, totals, alternative="greater")$p.value
+}
+
+bystage.df <- tiles_by_stage(bystage.grl, early_stages)
+
+bystage.df$pvalue <- bystage.df$group_name %>%
+                     lapply(stage_pvalue_for_group, bystage.df, "All VT tiles") %>%
+                     unlist
+
+g <- vt_percent_plot(bystage.df, "Early expression", group_order=names(colors), max_scale=100, scale_breaks=seq(from=0, to=100, by=25))
+g
+```
+
+``` {r by_stage_pvalues}
+bystage.df %>% pander(caption="One-sided proportion test compared to All VT tiles")
+```
+
+``` {r summarize_vts_by_term, fig.cap="", fig.width=7, fig.height=5, dev=c("png", "pdf")}
+
+term_pvalue_for_group <- function(group, data.df, compare_to) {
+  successes <- c(subset(data.df, group_name == group)$tiles_with_term[1],
+                 subset(data.df, group_name == compare_to)$tiles_with_term[1])
+  totals <- c(subset(data.df, group_name == group)$tiles[1],
+              subset(data.df, group_name == compare_to)$tiles[1])
+  
+  prop.test(successes, totals, alternative="greater")$p.value
+}
+
+tiles_by_term <- function(grl, terms) {
+  grl %>%
+    lapply(function(gr) {
+
+      gr_tiles <- gr$VTID %>% unique
+      term_tiles <- subset(vt.df, annotation %in% terms)$VTID %>% unique
+      
+      data.frame(stringsAsFactors=FALSE,
+                 terms = paste(terms, collapse=", "),
+                 tiles = length(gr_tiles),
+                 tiles_with_term = length(intersect(gr_tiles, term_tiles)),
+                 percent = length(intersect(gr_tiles, term_tiles)) / length(gr_tiles) * 100)
+      
+    }) %>%
+    bind_rows(.id="group_name")
+}
+
+early_tile_ids <- subset(vt.df, stage %in% early_stages)$VTID %>% unique
+early_tiles.gr <- subset(all_tiles.gr, VTID %in% early_tile_ids)
+
+group_order <- c("Higher in Toll10b", "Dorsal", "Twist", "Higher in gd7", "Mad", "Zen", "Early expressed VTs")
+
+terms <- vt.df$annotation %>% unique
+
+meso_terms <- terms[grep("meso", terms)]
+
+byterm.grl <- groups.list %>%
+              lapply(select_overlapping_vts, all_tiles.gr) %>%
+              c(list("Early expressed VTs"=early_tiles.gr))
+
+bymeso.df <- tiles_by_term(byterm.grl, meso_terms)
+bymeso.df$pvalue <- bymeso.df$group_name %>%
+                    lapply(term_pvalue_for_group, bymeso.df, "Non-differential CBP") %>%
+                    unlist
+                    
+g <- vt_percent_plot(bymeso.df, "Mesoderm", group_order=names(colors), reversed=TRUE, max_scale=60, scale_breaks=seq(from=0, to=60, by=20))
+g
+
+amnio_terms <- terms[grep("amnio", terms)]
+byamnio.df <- tiles_by_term(byterm.grl, amnio_terms)
+byamnio.df$pvalue <- byamnio.df$group_name %>%
+                     lapply(term_pvalue_for_group, byamnio.df, "Non-differential CBP") %>%
+                     unlist
+
+g <- vt_percent_plot(byamnio.df, "Amnioserosa", group_order=names(colors), max_scale=60, scale_breaks=seq(from=0, to=60, by=20))
+g
+```
+
+**Terms used for mesoderm:** `r paste0(meso_terms, collapse=", ")`
+
+**Terms used for amnioserosa:** `r paste0(amnio_terms, collapse=", ")`
+
+``` {r by_term_pvalues}
+
+bymeso.df %>% select(-terms) %>% pander(caption="One-sided proportion test for mesoderm terms compared to non-differential regions")
+byamnio.df %>% select(-terms) %>% pander(caption="One-sided proportion test for amnioserosa terms compared to non-differential regions")
+
+```
+
+```{r session_info_child, child="child_docs/session_info_child.Rmd"}
+
+```

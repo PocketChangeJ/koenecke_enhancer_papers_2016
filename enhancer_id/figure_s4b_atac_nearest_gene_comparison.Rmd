@@ -1,0 +1,275 @@
+```{r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+library(compiler)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_s4b_atac_nearest_gene_comparison")
+
+set.seed(12345)
+
+source("shared_code/knitr_common.r")
+source("shared_code/rnaseq.r")
+source("shared_code/granges_common.r")
+source("shared_code/flybase.r")
+source("shared_code/peakzilla.r")
+source("shared_code/import.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Figure S4b: Nearest gene comparison between ATAC enhancers and DV transcription factor binding
+
+```{r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+In this analysis, we will compare the nearest gene performance of our list of differential H3K27ac regions with the top DV transcription factor peaks. Peakzilla was run on the listed transcription factors and the top 400 non-TSS peaks were selected.
+
+```{r settings}
+cores <- function() {
+  return(8)
+}
+```
+
+```{r define_genes}
+rnaseq.df <- rnaseq_diff_exp_results()
+
+expressed_genes <- genes_expressed_in_tissue(c("gd", "toll"), fpkm_threshold=5)
+
+txs.gr <- flybase_txs_granges() %>%
+          subset(fb_gene_id %in% .(expressed_genes))
+
+tss.gr <- resize(txs.gr, width=1)
+
+higher_gd7.genes     <- subset(rnaseq.df, sample_1 == "gd" & sample_2 == "toll" & significant & direction == "down"   & RPKM_1 >= 5)$fb_gene_id
+higher_toll10b.genes <- subset(rnaseq.df, sample_1 == "gd" & sample_2 == "toll" & significant & direction == "up"     & RPKM_2 >= 5)$fb_gene_id
+```
+
+```{r load_dts_data}
+
+dts.df <- read.delim("data/external/dts_regions/Dorsal_network_targets.txt", stringsAsFactors=FALSE, header=TRUE) %>%
+          subset(DTS.high.confidence == 1) %>%
+          mutate(chr = paste0("chr", chr))
+dts_dm2.gr <- makeGRangesFromDataFrame(dts.df, seqnames.field="chr") %>%
+          resize(width=1, fix="center")
+dts_dm2.gr$name <- dts.df$id
+
+chain <- import.chain("data/external/dts_regions/dm2ToDm3.over.chain")
+
+dts.gr <- liftOver(dts_dm2.gr, chain) %>%
+          unlist %>%
+          resize(width=201, fix="center")
+
+dts.gr %<>% assign_nearest_gene %>%
+            subset(distance_to_tss > 1000)
+
+saveRDS(dts.gr, file=figure_path("dts_chipchip_nontss_regions.gr.rds"))            
+```
+
+```{r load_data}
+
+select_top_nontss <- function(gr, n) {
+  txs.gr <- flybase_txs_granges()
+  gr <- assign_nearest_gene(gr, txs.gr)
+  gr <- subset(gr, distance_to_tss > 1000)
+  gr <- gr[order(gr$score, decreasing=TRUE)][1:n]
+  gr$name <- paste0("peak_", seq_along(gr))
+  gr
+}
+
+all_atac.gr <- readRDS("figure_s3a_atac_peaks_with_differential_h3k27ac/final_peaks.gr.rds") %>%
+               updateObject %>%            
+               subset(classification != "TSS")
+
+enhancers.gr <- all_atac.gr %>%
+                subset(diff_bound_class != "No change")
+
+mcols(enhancers.gr) <- mcols(enhancers.gr)[, c("name", "diff_bound_class")]
+
+nondiff.gr <- all_atac.gr %>%
+              subset(diff_bound_class == "No change")
+
+txfactors <- list("Twist"="tl10b_twi_1.tsv",
+                  "Mad"="gd7_mad_2.tsv",
+                  "Zen"="gd7_zen_1.tsv",
+                  "Dorsal"="tl10b_dl_1.tsv") %>%
+             lapply(function(filename) {
+               data_path(file.path("peakzilla", filename))
+             })
+
+txfactors %<>% lapply(import.peakzilla) %>%
+               lapply(filter_chrs) %>%
+               lapply(select_top_nontss, 400)
+
+random.gr <- tileGenome(seqlengths(Dmelanogaster), tilewidth = 200, cut.last=TRUE) %>% 
+             filter_chrs %>%
+             assign_nearest_gene %>%
+             subset(distance_to_tss > 1000) %>%
+             sample(1000)
+
+saveRDS(txfactors, file=figure_path("txfactors.rds"))
+
+txfactors <- c(txfactors, list("DTS ChIP-chip"=dts.gr,
+                               "Putative mesoderm"=subset(enhancers.gr, diff_bound_class == "Higher in Toll10b"),
+                               "Putative dorsal ectoderm"=subset(enhancers.gr, diff_bound_class == "Higher in gd7"),
+                               "Non-differential ATAC"=nondiff.gr))
+
+saveRDS(txfactors, file=figure_path("nearest_gene_groups.list.rds"))
+```
+
+
+
+``` {r nearest_dv_gene}
+
+grl <- txfactors
+
+data.frame(Group=names(grl),
+           Size=pn(unname(elementNROWS(grl)))) %>% pander(caption="Enhancer group sizes")
+
+nearest.list <- cache("nearest.list", function() {
+  grl %>%
+    lapply(assign_nearest_gene, txs.gr) %>%
+    lapply(as.data.frame)
+})
+
+```
+
+``` {r diff_exp_plot_meso, dev=c("png", "pdf"), fig.cap="", fig.width=6, fig.height=5}
+
+pvalue_for_peak_group <- function(group_name, data.df, compare_to) {
+  success <- c(subset(data.df, peak_group == group_name)$diff_exp_count[1],
+               subset(data.df, peak_group == compare_to)$diff_exp_count[1])
+  totals <-  c(subset(data.df, peak_group == group_name)$n[1],
+               subset(data.df, peak_group == compare_to)$n[1])
+  prop.test(success, totals, alternative="greater")$p.value
+}
+
+add_pvalues <- function(data.df) {
+  data.df$pvalue <- data.df$peak_group %>%
+                    lapply(pvalue_for_peak_group, data.df, "Non-differential ATAC") %>%
+                    unlist
+  data.df
+}
+
+colors <- c("Putative mesoderm"="#49539E",
+            "Putative dorsal ectoderm"="#FCB13C",
+            "DTS ChIP-chip"="#67913F",
+            "Dorsal"="#A2BC71",
+            "Twist"="#02743E",
+            "Mad"="#CBAB6A",
+            "Zen"="#DBCE9B",
+            "Non-differential ATAC"="#808080",
+            "Top ATAC"="#808080",
+            "All ATAC"="#808080",
+            "Random"="#808080")
+
+nearest_meso.df <- nearest.list %>%
+                   lapply(function(list.df) {
+                       list.df$is_diff_exp  <- list.df$nearest_gene_id %in% higher_toll10b.genes
+                       list.df
+                     }) %>%
+                     bind_rows(.id="peak_group")
+
+percents_meso.df <- nearest_meso.df %>% 
+                      group_by(peak_group) %>%
+                      summarize(percent_diff_exp   = sum(is_diff_exp) / n() * 100,
+                                diff_exp_count     = sum(is_diff_exp),
+                                non_diff_exp_count = n() - sum(is_diff_exp),
+                                n                  = n()) %>%
+                      add_pvalues %>%
+                      mutate(significance = ifelse(pvalue < 0.05, "*  ", ""))
+                      
+percents_meso.df$peak_group <- factor(percents_meso.df$peak_group, levels=rev(names(colors)))
+
+include_groups <- c("Putative mesoderm",
+                    "Putative dorsal ectoderm",
+                    "DTS ChIP-chip",
+                    "Dorsal",
+                    "Twist",
+                    "Mad",
+                    "Zen",
+                    "Non-differential ATAC")
+
+figure_meso.df <- subset(percents_meso.df, peak_group %in% include_groups)
+
+g <- ggplot(figure_meso.df, aes(x=peak_group, y=percent_diff_exp, fill=peak_group)) +
+     geom_bar(stat="identity", position="dodge") +
+     geom_text(aes(label=significance), size=6) +
+     scale_fill_manual("Enhancer group", values=colors, guide="none") +
+     scale_y_reverse(expand=c(0, 0), limits=c(65, 0)) +
+     coord_flip() +
+     theme_bw() +
+     theme(panel.grid.minor=element_blank(),
+           panel.grid.major=element_blank(),
+           panel.border=element_rect(fill = "transparent", colour = NA),
+           axis.line.x=element_line(size=0.5, colour="black"),
+           axis.line.y=element_line(size=0.5, colour="black")) +
+     labs(x="", 
+          y="Percent of regions matched to an\nup-regulated gene\n",
+          title="Mesoderm") 
+g
+```
+
+``` {r meso_pvalues}
+percents_meso.df %>% pander(caption="One-sided proportion test compared to non-differential non-TSS ATAC peaks (mesoderm)")
+```
+
+``` {r diff_exp_plot_de, dev=c("png", "pdf"), fig.cap="", fig.width=6, fig.height=5}
+
+nearest_de.df <- nearest.list %>%
+                 lapply(function(list.df) {
+                       list.df$is_diff_exp  <- list.df$nearest_gene_id %in% higher_gd7.genes
+                       list.df
+                 }) %>%
+                 bind_rows(.id="peak_group")
+
+percents_de.df <- nearest_de.df %>% 
+                      group_by(peak_group) %>%
+                      summarize(percent_diff_exp   = sum(is_diff_exp) / n() * 100,
+                                diff_exp_count     = sum(is_diff_exp),
+                                non_diff_exp_count = n() - sum(is_diff_exp),
+                                n                  = n()) %>%
+                      add_pvalues %>%
+                      mutate(significance = ifelse(pvalue < 0.05, "  *", ""))
+
+percents_de.df$peak_group <- factor(percents_de.df$peak_group, levels=rev(names(colors)))
+
+include_groups <- c("Putative mesoderm",
+                    "Putative dorsal ectoderm",
+                    "DTS ChIP-chip",
+                    "Dorsal",
+                    "Twist",
+                    "Mad",
+                    "Zen",
+                    "Non-differential ATAC")
+
+figure_de.df <- subset(percents_de.df, peak_group %in% include_groups)
+g <- ggplot(figure_de.df, aes(x=peak_group, y=percent_diff_exp, fill=peak_group)) +
+     geom_bar(stat="identity", position="dodge") +
+     geom_text(aes(label=significance), size=6) +
+     scale_fill_manual("Enhancer group", values=colors, guide="none") +
+     scale_y_continuous(expand=c(0, 0), limits=c(0, 65)) +
+     coord_flip() +
+     theme_bw() +
+     theme(panel.grid.minor=element_blank(),
+           panel.grid.major=element_blank(),
+           panel.border=element_rect(fill = "transparent", colour = NA),
+           axis.line.x=element_line(size=0.5, colour="black"),
+           axis.line.y=element_line(size=0.5, colour="black")) +
+     labs(x="", 
+          y="Percent of regions matched to an\nup-regulated gene\n",
+          title="Dorsal Ectoderm")
+
+g
+```
+
+``` {r de_pvalues}
+percents_de.df %>% pander(caption="One-sided proportion test compared to non-differential non-TSS ATAC peaks (dorsal ectoderm)")
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

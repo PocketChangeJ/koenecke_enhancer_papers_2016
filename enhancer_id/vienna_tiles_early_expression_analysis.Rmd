@@ -1,0 +1,126 @@
+```{r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+
+# Output folder for this document
+options(knitr.figure_dir = "vienna_tiles_early_expression_analysis")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/vienna_tiles.r")
+source("shared_code/ggplot_theme.r")
+source("shared_code/import.r")
+```
+
+# Vienna tiles: CBP and ATAC early expression
+
+```{r header_child, child="child_docs/header_child.Rmd"}
+
+```
+
+## Overview
+
+```{r load_data}
+
+select_top_by_score <- function(gr, n=10000) {
+  gr <- gr[order(gr$score, decreasing=TRUE)]
+  gr[1:n]
+}
+
+macs_atac_peaks <- data_path("atacseq/macs/orer_atac_combined_peaks.narrowPeak")
+atac.gr <- import.narrowPeak(macs_atac_peaks) %>%
+           filter_chrs
+
+atac.gr$name <- paste0("atac_peak_", seq_along(atac.gr))
+
+collapsed.df <- atac.gr %>%
+                as.data.frame %>%
+                group_by(seqnames, start, end) %>%
+                summarize(keep = name[which.max(score)])
+
+atac.gr <- subset(atac.gr, name %in% collapsed.df$keep) 
+
+all_nej.gr <- readRDS("01_identify_nej_peaks_with_differential_h3k27ac/final_peaks.gr.rds")
+
+groups.list <- list("All ATAC"=atac.gr, 
+                    "All CBP"=all_nej.gr) %>%
+               lapply(select_top_by_score, n=10000)
+
+colors <- c("All CBP"="#808080",
+            "All ATAC"="#808080",
+            "All VT tiles"="#808080")
+
+```
+
+``` {r summarize_vts_by_stage, fig.cap="", fig.width=7, fig.height=5, dev=c("png", "pdf")}
+
+select_overlapping_vts <- function(gr, tiles.gr) {
+  ol <- findOverlaps(query=gr, subject=tiles.gr, ignore.strand=TRUE)
+  gr_tiles <- tiles.gr[subjectHits(ol)] %>% unique
+  gr_tiles
+}
+
+vt_percent_plot <- function(data_df, title, group_order=c(), reversed=FALSE, max_scale=100, scale_breaks) {
+  if(length(group_order) > 0) data_df$group_name <- factor(data_df$group_name, levels=rev(group_order))
+  g <- ggplot(data_df, aes(x=group_name, y=percent, fill=group_name)) +
+       geom_bar(position="identity", stat="identity")
+  if(reversed) {
+    g <- g + scale_y_reverse(expand=c(0, 0), limits=c(max_scale, 0), breaks=scale_breaks)
+  } else {
+    g <- g + scale_y_continuous(expand=c(0, 0), limits=c(0, max_scale), breaks=scale_breaks)
+  }
+  g <- g +     
+       scale_fill_manual("", values=colors, guide="none") +
+       coord_flip() +
+       theme_manuscript() +
+       theme(axis.text.y=element_text(hjust=1)) +
+       labs(y="Percent", x="", title=paste0(title, "\n"))
+  g
+}
+
+tiles_by_stage <- function(grl, stages) {
+  grl %>%
+    lapply(function(gr) {
+      gr_tiles <- gr$VTID %>% unique
+      stage_tiles <- subset(vt.df, stage %in% stages)$VTID %>% unique
+      
+      data.frame(stringsAsFactors = FALSE,
+                 stages           = paste(stages, collapse=", "),
+                 tiles            = length(gr_tiles),
+                 tiles_in_stage   = length(intersect(gr_tiles, stage_tiles)),
+                 percent          = length(intersect(gr_tiles, stage_tiles)) / length(gr_tiles) * 100)
+    }) %>%
+    bind_rows(.id="group_name")
+}
+
+bystage.grl <- groups.list %>%
+               lapply(select_overlapping_vts, all_tiles.gr) %>%
+               c(list("All VT tiles"=all_tiles.gr))
+
+early_stages <- c("stg4_6", "stg7_8", "stg9_10")
+
+stage_pvalue_for_group <- function(group, data.df, compare_to) {
+  successes <- c(subset(data.df, group_name == group)$tiles_in_stage[1],
+                 subset(data.df, group_name == compare_to)$tiles_in_stage[1])
+  totals <- c(subset(data.df, group_name == group)$tiles[1],
+              subset(data.df, group_name == compare_to)$tiles[1])
+  
+  prop.test(successes, totals, alternative="greater")$p.value
+}
+
+bystage.df <- tiles_by_stage(bystage.grl, early_stages)
+
+bystage.df$pvalue <- bystage.df$group_name %>%
+                     lapply(stage_pvalue_for_group, bystage.df, "All VT tiles") %>%
+                     unlist
+
+g <- vt_percent_plot(bystage.df, "Early expression", group_order=names(colors), max_scale=100, scale_breaks=seq(from=0, to=100, by=25))
+g
+```
+
+``` {r by_stage_pvalues}
+bystage.df %>% pander(caption="One-sided proportion test compared to All VT tiles")
+```
+
+```{r session_info_child, child="child_docs/session_info_child.Rmd"}
+
+```
