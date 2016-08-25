@@ -1,0 +1,161 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(dplyr)
+library(tidyr)
+library(magrittr)
+
+# Output folder for this document
+options(knitr.figure_dir = "build_spreadsheets")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/enhancers.r")
+source("shared_code/rnaseq.r")
+source("shared_code/samples.r")
+```
+
+# Spreadsheets
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r load_data}
+
+enhancers.df <- readRDS("figure_3d_zelda_and_polycomb/enhancers_with_pre.df.rds") %>%
+                select(-group)
+
+enrichments.df <- readRDS("calculate_enrichments_at_known_enhancers/enrichments.df.rds")
+dhs.df <- readRDS("figure_4b_dhs_time_course/dhs_known.rds")
+rnaseq.df <- rnaseq_results() 
+
+genes <- subset(enhancers.df, gene_name != "Unknown")$gene_name %>% unique
+rnaseq.df <- subset(rnaseq.df, fb_symbol %in% genes)[, c("fb_symbol", "RPKM_1", "RPKM_2")]
+names(rnaseq.df) <- c("gene_name", "FPKM.de", "FPKM.m")
+rnaseq.df[, 2:3] %<>% as.matrix %>% round(2)
+
+```
+
+## Enhancer spreadsheet
+
+  - Enhancer details
+  - Target gene expression in each tissue
+  - Tx factor enrichments
+  - Histone enrichments
+  - K27me3 low/high
+  - Distance to PRE
+  - Peak ID for nearest PRE
+  - DHS signal per stage
+
+``` {r build_enhancer_spreadsheet}
+
+enrichments_for_factor <- function(f) {
+  s.df <- subset(samples.df, factor == f)[, c("tissue", "factor")] %>% unique
+  e.df <- 1:nrow(s.df) %>%
+          lapply(function(i) {
+            tissue <- s.df$tissue[i]
+            enrichment_values(tissue, f, "best", enrichments.df)
+          }) %>%
+          bind_rows
+  e.df
+}
+
+enrichments_for_histone <- function(h) {
+  rbind(enrichment_values("m", h, "best", enrichments.df),
+        enrichment_values("de", h, "best", enrichments.df))
+}
+
+factors <- c("mad", "zen", "twi", "dl")
+histones <- c("h3k27ac", "h3k27me3", "h3k4me1")
+
+factor_long.df <- lapply(factors, enrichments_for_factor) %>% bind_rows
+factor_long.df %<>% transform(factor = paste0(factor, "_", tissue, "_enrichment"))
+
+factors.df <- factor_long.df %>%
+              mutate(enrichment = round(enrichment, 2)) %>%
+              select(enhancer_name, factor, enrichment) %>%
+              spread(factor, enrichment)
+
+histones_long.df <- lapply(histones, enrichments_for_histone) %>% bind_rows
+histones_long.df %<>% transform(factor = paste0(factor, "_", tissue, "_enrichment"))
+
+histones.df <- histones_long.df %>%
+               mutate(enrichment = round(enrichment, 2)) %>%
+               select(enhancer_name, factor, enrichment) %>%
+               spread(factor, enrichment)
+
+dhs.df %<>% select(enhancer_name, dhs_stage, dhs_score) %>%
+            mutate(dhs_stage = gsub("^S", "", dhs_stage),
+                   dhs_score = round(dhs_score, 2)) %>%
+            spread(dhs_stage, dhs_score)
+names(dhs.df)[-1] <- paste0("DHS_score_stage_", names(dhs.df)[-1])
+
+gene.df <- assign_nearest_gene(enhancers.gr) %>% as.data.frame
+gene.df <- gene.df[, c("enhancer_name", "distance_to_tss", "inside_gene")]
+gene.df %<>% transform(inside_gene = yesno(inside_gene == "TRUE"))
+gene.df$classification <- "Intergenic"
+gene.df$classification[gene.df$inside_gene == "Yes"] <- "Intragenic"
+gene.df$classification[gene.df$distance_to_tss < 1000] <- "TSS"
+gene.df <- gene.df[, c("enhancer_name", "classification")]
+
+ss.df <- enhancers.df %>%
+         merge(gene.df, all.x=TRUE) %>%
+         merge(rnaseq.df, all.x=TRUE) %>%
+         merge(histones.df, all.x=TRUE) %>%
+         merge(factors.df, all.x=TRUE) %>%
+         merge(dhs.df, all.x=TRUE) %>%
+         select(-width, -strand)
+
+stopifnot(length(unique(ss.df$enhancer_name)) == length(enhancers.gr))
+
+ss.df$activity %<>% gsub("^m$", "mesoderm", .) %>%
+                    gsub("^de$", "dorsal ectoderm", .)
+
+ss.df %<>% mutate(k27me3 = ifelse(k27me3 == "Yes", "High", "Low")) %>%
+           select(chr = seqnames,
+                  target_gene_name = gene_name,
+                  enhancer_type = activity,
+                  everything())
+
+names(ss.df) <- gsub("_de_enrichment", "_gd7_enrichment", names(ss.df)) %>%
+                gsub("_m_enrichment", "_Toll10b_enrichment", .) %>%
+                gsub("^k27me3$", "H3K27me3_classification", .) %>%
+                gsub("h3k27", "H3K27", .) %>%
+                gsub("h3k4", "H3K4", .) %>%
+                gsub("FPKM.de", "FPKM_gd7", .) %>%
+                gsub("FPKM.m", "FPKM_Toll10b", .) %>%
+                gsub("^pre_", "PRE_", .)
+          
+cols <- c("enhancer_name", "target_gene_name", "enhancer_type", "classification", "chr", "start", "end", "reference",
+          "H3K27ac_gd7_enrichment", "H3K27ac_Toll10b_enrichment", "H3K27me3_gd7_enrichment",
+          "H3K27me3_Toll10b_enrichment", "H3K4me1_gd7_enrichment", "H3K4me1_Toll10b_enrichment",
+          "dl_Toll10b_enrichment", "mad_gd7_enrichment", "twi_Toll10b_enrichment",
+          "zen_gd7_enrichment", "FPKM_gd7", "FPKM_Toll10b", 
+          "H3K27me3_classification", "PRE_distance", "PRE_peak_name", 
+          "DHS_score_stage_5", "DHS_score_stage_9", "DHS_score_stage_10",
+          "DHS_score_stage_11", "DHS_score_stage_14")
+
+before_col_count <- ncol(ss.df)
+ss_new.df <- ss.df[, cols]
+stopifnot(before_col_count == ncol(ss_new.df))
+ss.df <- ss_new.df
+          
+ss.df %>% pander
+write.table(ss.df, file=figure_path("enhancer_spreadsheet.xls"), quote=F, na="", sep="\t", row.names=FALSE, col.names=TRUE)
+saveRDS(ss.df, file=figure_path("enhancer_spreadsheet.df.rds"))
+```
+
+## PRE spreadsheet
+
+```{r build_pre_spreadsheet}
+
+pre.df <- readRDS("figure_3d_zelda_and_polycomb/pre.gr.rds") %>%
+          as.data.frame %>%
+          select(-width, -strand) %>%
+          select(chr = seqnames, everything())
+
+pre.df %>% head %>% pander
+write.table(pre.df, file=figure_path("pre_peaks.xls"), quote=F, sep="\t", row.names=FALSE, col.names=TRUE)
+saveRDS(pre.df, file=figure_path("pre_peaks.df.rds"))
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

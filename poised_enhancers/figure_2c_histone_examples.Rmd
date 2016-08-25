@@ -1,0 +1,180 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(GenomicFeatures)
+library(TxDb.Dmelanogaster.UCSC.dm3.ensGene)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+library(rtracklayer)
+library(magrittr)
+library(dplyr)
+library(readr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_2c_histone_examples")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+source("shared_code/enhancers.r")
+source("shared_code/gviz.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Known enhancer example figures
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r bigwigs}
+
+histones.enrichment <- list("H3K27ac"=list(meso = sample_bigwig("tl10b_h3k27ac_1", bigwig="enrichment"),
+                                           de   = sample_bigwig("gd7_h3k27ac_1", bigwig="enrichment")),
+                            "H3K4me1"=list(meso = sample_bigwig("tl10b_h3k4me1_1", bigwig="enrichment"),
+                                           de   = sample_bigwig("gd7_h3k4me1_1", bigwig="enrichment")))
+
+histones.enrichment %>%
+  unlist(recursive=TRUE) %>%
+  file.exists %>%
+  all %>%
+  stopifnot
+
+histones.colors <- list(meso="#4B549B", de="#FAB049")
+
+enhancers.gr$name <- enhancers.gr$enhancer_name
+enhancers.gr$collapse <- FALSE
+
+e_5kb.gr <- resize(enhancers.gr, width=5000, fix="center")
+
+```
+
+``` {r common}
+
+build_histone_track <- function(bigwigs, histone, region.gr, histone_colors, max_value) {
+  meso.bw <- bigwigs$meso
+  de.bw   <- bigwigs$de
+  
+  if(is.na(max_value)) {
+    message("Max value for ", histone, " not provided")
+    max_value <- pmax(max_value(meso.bw, region.gr), max_value(de.bw, region.gr))
+  }
+    
+  track_name <- histone
+  gviz_dual_data_track(meso.bw, de.bw, region.gr, track_name, histone_colors, max_value)
+}
+
+plot_region <- function(region.gr, 
+                        histone_bws, histone_limits, histone_colors,
+                        enhancers.gr) {
+
+  message("Building: ", region.gr$name)
+  stopifnot(length(region.gr) == 1)
+  
+  r_chr <- as.character(seqnames(region.gr))
+  r_start <- start(region.gr)
+  r_end   <- end(region.gr)
+  
+  collapse_txs <- region.gr$collapse
+  
+  grtrack <- GeneRegionTrack(range=TxDb.Dmelanogaster.UCSC.dm3.ensGene,
+                             genome="dm3",
+                             chromosome=r_chr,
+                             name="Genes",
+                             showId=FALSE,
+                             geneSymbol=TRUE,
+                             fill="black", collapseTranscripts=collapse_txs)
+
+  e.gr <- enhancers.gr[seqnames(enhancers.gr) == r_chr]
+  e.gr$feature <- "enhancer"
+  e.gr$id <- e.gr$name
+  enhancers_track <- AnnotationTrack(range=e.gr, strand=rep("*", length(e.gr)),
+                                     genome="dm3", name="Enhancers", showFeatureId=TRUE,
+                                     stacking="dense", fill="black", fontsize=9)
+  
+  activity_colors <- c("m"="#4B549B", "de"="#FAB049")
+  
+  histone_tracks <- names(histone_bws) %>%
+                    lapply(function(histone) {
+                      build_histone_track(histone_bws[[histone]], histone, region.gr,
+                                          histone_colors, histone_limits[[histone]])
+                    })
+
+  list(gene_track=grtrack, axis_track=GenomeAxisTrack(), data_tracks=histone_tracks, enhancers_track=enhancers_track, 
+       region_chr=r_chr, region_start=r_start, region_end=r_end, region_name=region.gr$name)
+}
+
+track_list <- function(track_list) {
+  c(list(track_list$axis_track), track_list$data_tracks, list(track_list$enhancers_track, track_list$gene_track))
+}
+
+```
+
+``` {r build_figures, message=FALSE}
+
+# 5kb
+group1_enhancers <- c("zen_dist_Doyle", "dpp_Huang", "tld_Kirov", "tup_Zeitlinger")
+group2_enhancers <- c("sna_Ip", "htl_Stathopoulos", "tin_Yin")
+
+group_limits <- list("H3K27ac"=14,
+                     "H3K4me1"=6)
+
+group1_plots <- cache("group1_plots", function() {
+  group.gr <- e_5kb.gr[e_5kb.gr$name %in% group1_enhancers]
+  seq_along(group.gr) %>%
+    lapply(function(i) {
+      plot_region(group.gr[i],
+                  histones.enrichment, group_limits, histones.colors,
+                  enhancers.gr)
+    })  
+}, cache=FALSE)
+
+group2_plots <- cache("group2_plots", function() {
+  group.gr <- e_5kb.gr[e_5kb.gr$name %in% group2_enhancers]
+  
+  # add midpoint between the two Twi enhancers
+  twi_midpoint.gr <- subset(enhancers.gr, gene_name == "twi") %>%
+                     range %>%
+                     resize(width=7000, fix="center")
+
+  mcols(twi_midpoint.gr) <- mcols(group.gr[1])
+  twi_midpoint.gr$name <- "twi (both)"
+  
+  group.gr %<>% c(twi_midpoint.gr)
+  
+  seq_along(group.gr) %>%
+    lapply(function(i) {
+      plot_region(group.gr[i],
+                  histones.enrichment, group_limits, histones.colors,
+                  enhancers.gr)
+    })  
+}, cache=FALSE)
+
+```
+
+``` {r display_figures, fig.width=28, fig.height=32, dev=c("pdf"), message=FALSE}
+
+export_plot_pdf <- function(track, plot_base) {
+  file <- figure_path(paste0(track$region_name, plot_base, ".pdf"))
+  pdf(file, width=28, height=32)
+
+  message("Plotting: ", track$region_name)
+  
+  tracklist <- track_list(track)
+  
+  sizes <- c(0.2, rep(1, times=length(tracklist) - 3), 0.2, 0.2)
+  
+  plotTracks(tracklist,
+             sizes=sizes,
+             chromosome=track$region_chr,
+             from=track$region_start,
+             to=track$region_end,
+             main=track$region_name,
+             cex.title=1.5, col.title="black", col.axis="black",
+             fontcolor.legend="black", cex.legend=0.5) 
+  dev.off()  
+}
+
+nothing <- group1_plots %>% lapply(export_plot_pdf, "_5kb_region_figure2c")
+nothing <- group2_plots %>% lapply(export_plot_pdf, "_5kb_region_figure2c")
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

@@ -1,0 +1,175 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_2ab_3ab_histone_boxplots")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+source("shared_code/enhancers.r")
+source("shared_code/ggplot_theme.r")
+source("shared_code/dhs.r")
+source("shared_code/flybase.r")
+```
+
+# Figure 3: Histone boxplots
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+``` {r load_data}
+enrichments.df <- readRDS("calculate_enrichments_at_known_enhancers/enrichments.df.rds")
+medians.df <- readRDS("calculate_histone_normalization_factors/medians.df.rds")
+```
+
+## Figure 3A: H3K27Ac, H3K4me1 and H3K27me3 boxplots
+
+Closed regions are the same as those used in Figure 1B.
+
+``` {r build_histone_boxplots}
+
+late_dhs <- readRDS("figure_1b_transcription_factor_boxplots/late_dhs_with_k27ac.gr.rds")
+
+late_dhs %<>% resize(width=1001, fix="center")
+
+add_enrichments <- function(tissue, factor, gr) {
+  tissue_ <- tissue
+  factor_ <- factor
+  replicate_ <- enrichment_values(tissue, factor, "best", enrichments.df)$replicate[1]
+  
+  sample.df <- subset(samples.df, tissue == tissue_ & factor == factor_ & replicate == replicate_)
+  stopifnot(nrow(sample.df) == 1)
+  ip.bw <- sample_bigwig(sample.df$sample, bigwig="ip")
+  wce.bw <- sample_bigwig(sample.df$sample, bigwig="wce")
+  
+  gr$enrichment <- (regionSums(gr, ip.bw) / total_signal(ip.bw)) / (regionSums(gr, wce.bw) / total_signal(wce.bw))
+  gr$tissue <- tissue
+  gr$factor <- factor
+  gr
+}
+
+closed_group <- bind_rows(add_enrichments("m", "h3k27ac", late_dhs) %>% as.data.frame,
+                          add_enrichments("m", "h3k4me1", late_dhs) %>% as.data.frame,
+                          add_enrichments("m", "h3k27me3", late_dhs) %>% as.data.frame)
+closed_group$group <- "Closed regions"
+
+m_enhancers  <- subset(enhancers.df, activity == "m")$enhancer_name
+de_enhancers <- subset(enhancers.df, activity == "de")$enhancer_name
+
+active_group <- bind_rows(enrichment_values("m",  "h3k27ac", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                          enrichment_values("de", "h3k27ac", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                          enrichment_values("m",  "h3k4me1", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                          enrichment_values("de", "h3k4me1", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                          enrichment_values("m",  "h3k27me3", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                          enrichment_values("de", "h3k27me3", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers))
+active_group$group <- "Active enhancers"
+
+repressed_group <- bind_rows(enrichment_values("m",  "h3k27ac", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                             enrichment_values("de", "h3k27ac", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                             enrichment_values("m",  "h3k4me1", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                             enrichment_values("de", "h3k4me1", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                             enrichment_values("m",  "h3k27me3", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                             enrichment_values("de", "h3k27me3", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers))
+repressed_group$group <- "Repressed enhancers"
+
+cols <- c("factor", "enrichment", "group")
+
+groups.df <- bind_rows(active_group[, cols],
+                       repressed_group[, cols],
+                       closed_group[, cols])
+
+groups.df$group <- factor(groups.df$group, levels=c("Active enhancers", "Repressed enhancers", "Closed regions"))
+groups.df$factor <- factor(groups.df$factor, levels=c("h3k27ac", "h3k4me1", "h3k27me3"))
+
+group_colors <- c("Active enhancers"="#EB423D", "Repressed enhancers"="#B62324", "Closed regions"="#631A29")
+
+g <- ggplot(groups.df, aes(x=factor, y=log2(enrichment), fill=group)) +
+     geom_boxplot() +
+     scale_fill_manual("", values=group_colors) +
+     labs(x="", y="Normalized ChIP-seq\nenrichments over input (log2)\n") +
+     theme_manuscript()
+```
+
+``` {r display_histone_boxplots, fig.width=8, fig.height=6, dev=c("png", "pdf")}
+g
+```
+
+``` {r histone_boxplots_statistics}
+
+wilcox_pvalue <- function(enrichments, groups, group1, group2) {
+  wilcox.test(x = enrichments[groups == group1],
+              y = enrichments[groups == group2],
+              alternative = "two.sided",
+              paired = FALSE)$p.value
+}
+
+stats.df <- groups.df %>%
+            group_by(factor) %>%
+            summarize(active_v_repressed_pvalue = wilcox_pvalue(log2(enrichment), group, "Active enhancers", "Repressed enhancers"),
+                      active_v_closed_pvalue    = wilcox_pvalue(log2(enrichment), group, "Active enhancers", "Closed regions"),
+                      repressed_v_closed_pvalue = wilcox_pvalue(log2(enrichment), group, "Repressed enhancers", "Closed regions"))
+
+stats.df %>% pander(caption="Wilcoxon two-sided unpaired test")
+```
+
+## Figure 3B: Histone fold changes
+
+``` {r build_histone_fold_changes_plot}
+
+collect_histone_fold_changes <- function(histone, enrichments.df, medians.df) {
+  e.m  <- enrichment_values("m",  histone, "best", enrichments.df)[, c("enhancer_name", "enrichment")]
+  e.de <- enrichment_values("de", histone, "best", enrichments.df)[, c("enhancer_name", 'enrichment')]
+  
+  names(e.m)[2] <- "enrichment.m"
+  names(e.de)[2] <- "enrichment.de"
+  
+  correction_factor <- subset(medians.df, factor == histone)$median_log2_fold_change
+  
+  e <- merge(e.m, e.de)
+  e <- transform(e, fold_change = log2(enrichment.m / enrichment.de) - correction_factor)
+  e$histone <- histone
+  e
+}
+
+histones <- c("h3k27ac", "h3k4me1", "h3k27me3")
+
+histones.df <- histones %>%
+               lapply(collect_histone_fold_changes, enrichments.df, medians.df) %>%
+               bind_rows
+
+histones.df <- merge(enhancers.df[, c("enhancer_name", "activity")], histones.df)
+
+histones.df$histone <- factor(histones.df$histone, levels=histones)
+histones.df$activity <- factor(histones.df$activity, levels=c("m", "de"))
+g <- ggplot(histones.df, aes(x=histone, y=fold_change, fill=activity)) +
+     geom_boxplot() +
+     scale_fill_manual("Enhancer type", values=activity_colors) +
+     theme_manuscript() +
+     labs(x="", y="Normalized ChIP-seq enrichment\nover input Toll10b vs gd7\n(log2 fold change)\n")
+
+```
+
+``` {r display_histone_fold_changes_plot, dev=c("png", "pdf")}
+g
+```
+
+``` {r histone_fold_changes_statistics}
+
+stats.df <- histones.df %>%
+            group_by(histone) %>%
+            summarize(wilcox.pvalue = wilcox.test(x = fold_change[activity == "m"], 
+                                                  y = fold_change[activity == "de"],
+                                                  alternative = "two.sided",
+                                                  paired = FALSE)$p.value)
+
+stats.df %>% pander(caption="Wilcoxon two-sided unpaired test")
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

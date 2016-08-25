@@ -1,0 +1,257 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(dplyr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_1b_transcription_factor_boxplots")
+
+source("shared_code/knitr_common.r")
+source("shared_code/ggplot_theme.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+source("shared_code/flybase.r")
+source("shared_code/enhancers.r")
+source("shared_code/import.r")
+source("shared_code/dhs.r")
+```
+
+# Figure 1B: Transcription factor boxplots
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r load_data}
+enrichments.df <- readRDS("calculate_enrichments_at_known_enhancers/enrichments.df.rds")
+dhs.grl <- load_dhs()
+late_k27ac.gr <- import.modencode_gff("data/external/modencode/4120_repset.17400896.enrichment.clusters.gff3.gz")
+```
+
+## Closed regions
+
+Closed regions are putative enhancer regions active in the late (14-16h AEL) embryo but not active in the early embryo (2-4h AEL). These are defined by the following criteria:
+
+  * Defined as open by DHS only in Stage 14 but no previous stages
+  * More than 1,000 bp from an annotated TSS
+  * Enriched in H3K27Ac in 14-16h (using modENCODE's list of enriched regions)
+  * At least 200 bp in width
+
+``` {r define_dhs_regions}
+
+dhs.14 <- dhs.grl[["S14"]]
+dhs.other <- dhs.grl[names(dhs.grl) != "S14"] %>% 
+             unname %>%
+             do.call(c, .) %>%
+             reduce %>%
+             coverage
+
+dhs.14$early_score <- regionSums(dhs.14, dhs.other)
+late_dhs <- dhs.14[dhs.14$early_score == 0]
+
+late_dhs <- intersect(late_dhs, late_k27ac.gr)
+
+late_dhs <- late_dhs[width(late_dhs) >= 200]
+
+set.seed(12345)
+
+late_dhs %<>% assign_nearest_gene %>%
+              subset(distance_to_tss > 1000) %>%
+              sample(100)
+
+saveRDS(late_dhs, file=figure_path("late_dhs_with_k27ac.gr.rds"))
+```
+
+``` {r select_top_replicate}
+
+factors <- c("dl", "twi", "mad", "zen", "zld")
+
+medians.df <- enrichments.df %>%
+              filter(factor %in% factors) %>%
+              group_by(tissue, factor, replicate) %>%
+              summarize(median_enrichment = median(enrichment))
+
+replicates.df <- medians.df %>%
+                 group_by(tissue, factor) %>%
+                 summarize(best_median_enrichment = max(median_enrichment),
+                           replicate              = replicate[which.max(median_enrichment)])
+
+medians.df %>% pander(caption="Median enrichment values")
+replicates.df %>% pander(caption="Replicate selection")
+```
+
+``` {r add_enrichments_to_dhs_regions}
+
+find_bigwig <- function(factor, tissue, replicate, type="ip") {
+  sample_name <- samples.df$sample[samples.df$factor == factor & samples.df$tissue == tissue & samples.df$replicate == replicate]
+  sample_bigwig(sample_name, type)
+}
+
+add_enrichments <- function(gr, factor, tissue, replicate) {
+  ip.bw <- find_bigwig(factor, tissue, replicate, "ip")
+  wce.bw <- find_bigwig(factor, tissue, replicate, "wce")
+  
+  regions.gr <- gr
+  start(regions.gr) <- end(regions.gr) <- regionWhichMaxs(regions.gr, ip.bw)
+  regions.gr %<>% resize(201, fix="center")
+  
+  gr$ip_signal <- regionSums(regions.gr, ip.bw)
+  gr$wce_signal <- regionSums(regions.gr, wce.bw)
+  gr$total_ip_signal <- total_signal(ip.bw)
+  gr$total_wce_signal <- total_signal(wce.bw)
+  gr$enrichment <- with(mcols(gr), (ip_signal / total_ip_signal) / (wce_signal / total_wce_signal))
+  gr$tissue <- tissue
+  gr$factor <- factor
+  gr$replicate <- replicate
+  gr
+}
+
+dhs_enrichments.df <- 1:nrow(replicates.df) %>%
+                      lapply(function(i) {
+                        i.gr <- add_enrichments(late_dhs, replicates.df$factor[i], replicates.df$tissue[i], replicates.df$replicate[i])
+                        as.data.frame(i.gr)
+                      }) %>%
+                      bind_rows
+
+dhs_zelda.df <- subset(dhs_enrichments.df, factor == "zld")
+dhs_zelda.df$factor <- "zld (both)"
+dhs_zelda.df$group <- "Closed regions"
+
+dhs_enrichments.df$factor[dhs_enrichments.df$factor == "zld" & dhs_enrichments.df$tissue == "de"] <- "zld_de"
+dhs_enrichments.df$factor[dhs_enrichments.df$factor == "zld" & dhs_enrichments.df$tissue == "m"] <- "zld_m"
+
+dhs_enrichments.df %<>% select(enrichment, factor)
+
+dhs_enrichments.df$group <- "Closed regions"
+
+m_enhancers  <- subset(enhancers.df, activity == "m")$enhancer_name
+de_enhancers <- subset(enhancers.df, activity == "de")$enhancer_name
+
+active_group <- bind_rows(enrichment_values("m",  "twi", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                          enrichment_values("m",  "dl",  "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                          enrichment_values("m",  "zld", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                          enrichment_values("de", "mad", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                          enrichment_values("de", "zen", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                          enrichment_values("de", "zld", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers))
+
+active_zelda <- subset(active_group, factor == "zld")
+active_zelda$group <- "Active enhancers"
+
+active_group$factor[active_group$factor == "zld" & active_group$tissue == "de"] <- "zld_de"
+active_group$factor[active_group$factor == "zld" & active_group$tissue == "m"] <- "zld_m"
+active_group$group <- "Active enhancers"
+
+repressed_group <- bind_rows(enrichment_values("m",  "twi", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                             enrichment_values("m",  "dl",  "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                             enrichment_values("m",  "zld", "best", enrichments.df) %>% filter(enhancer_name %in% de_enhancers),
+                             enrichment_values("de", "mad", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                             enrichment_values("de", "zen", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers),
+                             enrichment_values("de", "zld", "best", enrichments.df) %>% filter(enhancer_name %in% m_enhancers))
+
+repressed_zelda <- subset(repressed_group, factor == "zld")
+repressed_zelda$group <- "Repressed enhancers"
+
+repressed_group$factor[repressed_group$factor == "zld" & repressed_group$tissue == "de"] <- "zld_de"
+repressed_group$factor[repressed_group$factor == "zld" & repressed_group$tissue == "m"] <- "zld_m"
+repressed_group$group <- "Repressed enhancers"
+```
+
+## Enrichments figure
+
+``` {r build_plot}
+
+all_zelda <- rbind(active_zelda, repressed_zelda)
+all_zelda$factor <- "zld (both)"
+
+cols <- c("factor", "enrichment", "group")
+
+groups.df <- bind_rows(active_group[, cols],
+                       repressed_group[, cols],
+                       all_zelda[, cols],
+                       dhs_zelda.df[, cols],
+                       dhs_enrichments.df[, cols])
+
+groups.df$group <- factor(groups.df$group, levels=c("Active enhancers", "Repressed enhancers", "Closed regions"))
+
+group_colors <- c("Active enhancers"="#EB423D", "Repressed enhancers"="#B62324", "Closed regions"="#631A29")
+
+groups.df$factor <- factor(groups.df$factor, levels=c("dl", "twi", "zld_m", "mad", "zen", "zld_de", "zld (both)"))
+
+g <- ggplot(groups.df, aes(x=factor, y=log2(enrichment), fill=group)) +
+     geom_boxplot(outlier.size=1) +
+     scale_fill_manual("", values=group_colors) +
+     labs(x="", y="Normalized ChIP-seq\nenrichments over input (log2)\n") +
+     theme_manuscript()
+
+```
+
+``` {r display_plot, fig.width=9, fig.height=5.5, dev=c("png", "pdf")}
+g
+```
+
+### Statistics
+
+``` {r statistics}
+
+wilcox_pvalue_by_group <- function(enrichments, groups, group1, group2) {
+  wilcox.test(x = enrichments[groups == group1],
+              y = enrichments[groups == group2],
+              alternative = "two.sided",
+              paired = FALSE)$p.value
+}
+
+stats.df <- groups.df %>%
+            group_by(factor) %>%
+            summarize(active_vs_repressed_pvalue = wilcox_pvalue_by_group(enrichment, group, "Active enhancers", "Repressed enhancers"),
+                      repressed_vs_closed_pvalue = wilcox_pvalue_by_group(enrichment, group, "Repressed enhancers", "Closed regions"),
+                      active_n = sum(group == "Active enhancers"),
+                      repressed_n = sum(group == "Repressed enhancers"),
+                      closed_n = sum(group == "Closed regions"))
+
+stats.df %>% pander
+```
+
+## Fold change figure
+
+```{r zelda_fold_change}
+
+enhancers <- enhancers.df %>%
+             select(enhancer_name, gene_name, active_tissue = activity)
+
+zld_de <- enrichment_values(tissue="de", factor="zld", replicate="best", enrichments.df) %>%
+          mutate(zld.de = log2(enrichment)) %>%
+          select(enhancer_name, zld.de)
+              
+zld_m  <- enrichment_values(tissue="m", factor="zld", replicate="best", enrichments.df) %>%
+          mutate(zld.m = log2(enrichment)) %>%
+          select(enhancer_name, zld.m) 
+
+zelda_both <- merge(zld_de, zld_m) %>%
+              merge(enhancers) %>%
+              mutate(zld_fc = zld.m - zld.de)
+
+```
+
+```{r zelda_fold_change_plot, dev=c("png", "pdf"), fig.cap="", fig.width=3, fig.height=5}
+zelda_both$active_tissue %<>% factor(levels=c("m", "de"))
+
+g <- ggplot(zelda_both, aes(x=active_tissue, y=zld_fc, fill=active_tissue)) +
+     geom_boxplot() +
+     scale_fill_manual("", values=activity_colors) +
+     theme_manuscript() +
+     labs(x="", y="Fold change in Zelda\nToll/gd (log2)\n")
+g
+```
+
+### Statistics
+
+```{r zelda_fold_change_stats}
+
+values_meso <- subset(zelda_both, active_tissue == "m")$zld_fc
+values_de   <- subset(zelda_both, active_tissue == "de")$zld_fc
+
+zelda_fc_test <- data_frame("Test"="Wilcox two-sided", n=nrow(zelda_both), pvalue=wilcox.test(x = values_meso, y = values_de, alternative = "two.sided", paired=FALSE)$p.value)
+
+zelda_fc_test %>% pander(caption="Zelda fold change between meso and DE")
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

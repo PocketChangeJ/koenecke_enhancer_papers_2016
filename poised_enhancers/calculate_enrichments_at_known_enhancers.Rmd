@@ -1,0 +1,77 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(dplyr)
+
+# Output folder for this document
+options(knitr.figure_dir = "calculate_enrichments_at_known_enhancers")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/enhancers.r")
+source("shared_code/samples.r")
+```
+
+# Calculate histone and transcription factor enrichments at known enhancers
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+For each known enhancer, we will calculate an enrichment value for all histone marks and transcription factors in each tissue.
+
+For transcription factors, the enrichment will be calculated using a 201bp window centered at the summit within the enhancer.
+
+For histone marks, the enrichment will be calculated using a 1001bp window centered on the enhancer itself.
+
+The whole cell extract samples used for enrichment calculations are:
+
+  * Toll10b: `tl10b_combined_wce` (all available Toll10b WCE samples merged into one)
+  * gd7: `gd7_combined_wce` (all available gd7 WCE samples merged into one)
+
+Enrichment is calculated using the following equation, 
+
+$$enrichment = \frac{\frac{ChIP\ signal\ in\ region}{total\ ChIP\ signal}}{\frac{WCE\ signal\ in\ region}{total\ WCE\ signal}}$$
+
+``` {r calculate_enrichments}
+
+single_sample_enrichment <- function(i, samples.df, enhancers.gr) {
+  stopifnot(length(i) == 1)
+
+  mcols(enhancers.gr) <- mcols(enhancers.gr)[, c("enhancer_name"), drop=FALSE]
+  enhancers.gr$enhancer
+  enhancers.gr$sample_name <- samples.df$sample[i]
+  enhancers.gr$tissue <- samples.df$tissue[i]
+  enhancers.gr$factor <- samples.df$factor[i]
+  enhancers.gr$factor_type <- samples.df$type[i]
+  enhancers.gr$replicate <- samples.df$replicate[i]
+  
+  regions.gr <- enhancers.gr
+  
+  ip.bigwig <- sample_bigwig(samples.df$sample[i], "ip")
+  wce.bigwig <- sample_bigwig(samples.df$sample[i], "wce")
+  
+  if(samples.df$type[i] == "histone") {
+    regions.gr <- resize(regions.gr, width=1001, fix="center")
+  } else {
+    start(regions.gr) <- end(regions.gr) <- regionWhichMaxs(enhancers.gr, ip.bigwig)
+    regions.gr <- resize(regions.gr, width=201, fix="center")
+  }
+  
+  enhancers.gr$ip_signal <- regionSums(regions.gr, ip.bigwig)
+  enhancers.gr$wce_signal <- regionSums(regions.gr, wce.bigwig)
+  enhancers.gr$total_ip_signal <- total_signal(ip.bigwig)
+  enhancers.gr$total_wce_signal <- total_signal(wce.bigwig)
+  enhancers.gr$enrichment <- with(mcols(enhancers.gr), (ip_signal / total_ip_signal) / (wce_signal / total_wce_signal))
+  as.data.frame(enhancers.gr)
+}
+
+enrichments.df <- cache("enrichments.df", function() {
+  1:nrow(samples.df) %>%
+    checked_mclapply(single_sample_enrichment, samples.df, enhancers.gr, mc.cores=6, mc.preschedule=FALSE) %>%
+    bind_rows
+})
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

@@ -1,0 +1,191 @@
+```{r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_3d_zelda_and_polycomb")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/enhancers.r")
+source("shared_code/import.r")
+source("shared_code/ggplot_theme.r")
+source("shared_code/dhs.r")
+source("shared_code/samples.r")
+source("shared_code/flybase.r")
+```
+
+# Figure 3D: Known enhancers, Zelda-bound regions and Polycomb
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+ - Define PREs
+ - Define Zelda peaks
+ - Classify Zelda peaks and known enhancers by H3K27me3 levels (low or high)
+ - Calculate distance to nearest PRE 
+ - Plot results
+
+## Define PREs
+
+```{r define_pres}
+pc.gr <- import.macs_peak(data_path("macs/orer_pc_1_peaks.narrowPeak")) %>% filter_chrs
+pc.gr <- pc.gr[order(pc.gr$score, decreasing=TRUE)]
+pc.gr$enrichment <- regionEnrichments(pc.gr, sample_bigwig("orer_pc_1", bigwig="ip"), 
+                                             sample_bigwig("orer_pc_1", bigwig="wce"))
+pc.gr <- pc.gr[1:pmin(length(pc.gr), 1000)]
+
+gaf.gr <- import.macs_peak(data_path("macs/orer_gaf_1_peaks.narrowPeak")) %>% filter_chrs
+
+pre.gr <- intersect(pc.gr, gaf.gr)
+pre.gr <- pre.gr[width(pre.gr) >= 50]
+
+pre.gr$name <- paste0("PRE_peak_", seq_along(pre.gr))
+
+saveRDS(pre.gr, file=figure_path("pre.gr.rds"))
+```
+
+PREs are defined as the intersection of the top 1,000 Pc ChIP-seq peaks and all GAF ChIP-seq peaks (`r pn(length(gaf.gr))`).
+
+Only intersections of at least 50 bp are included. This results in `r pn(length(pre.gr))` PREs.
+
+## Define Zelda peaks
+
+```{r load_zelda_peaks}
+
+calculate_enrichment <- function(gr, sample_name) {
+  
+  ip.bw <- sample_bigwig(sample_name, bigwig="ip")
+  wce.bw <- sample_bigwig(sample_name, bigwig="wce")
+  
+  e <- log2( (regionSums(gr, ip.bw) / total_signal(ip.bw)) / 
+             (regionSums(gr, wce.bw) / total_signal(wce.bw)))
+  
+  min_e <- min(e[is.finite(e)])
+  infs <- which(!is.finite(e))
+  if(length(infs) > 0) e[infs] <- min_e
+  e
+}
+
+enrichments.df <- readRDS("calculate_enrichments_at_known_enhancers/enrichments.df.rds")
+
+m.zelda  <- enrichment_values("m",  "zld", "best", enrichments.df)
+de.zelda <- enrichment_values("de", "zld", "best", enrichments.df)
+
+zelda_meso_sample <- subset(samples.df, factor == "zld" & tissue == "m" & replicate == m.zelda$replicate[1])$sample
+zelda_de_sample   <- subset(samples.df, factor == "zld" & tissue == "de" & replicate == de.zelda$replicate[1])$sample
+
+zelda_m.gr  <- import.macs_peak(data_path(file.path("macs", paste0("tl10b_zld_", m.zelda$replicate[1], "_peaks.narrowPeak")))) %>% filter_chrs
+zelda_de.gr <- import.macs_peak(data_path(file.path("macs", paste0("gd7_zld_",     de.zelda$replicate[1], "_peaks.narrowPeak")))) %>% filter_chrs
+
+zelda.gr <- c(zelda_m.gr, zelda_de.gr) %>% reduce
+
+zelda_regions.gr <- resize(zelda.gr, width=201, fix="center")
+zelda.gr$max_enrichment <- pmax(calculate_enrichment(zelda_regions.gr, zelda_meso_sample),
+                                calculate_enrichment(zelda_regions.gr, zelda_de_sample))
+
+zelda.gr <- subset(zelda.gr, max_enrichment > 1)
+
+zelda.gr$name <- paste0("zelda_combined_peaks_", seq_along(zelda.gr))
+```
+
+Peaks from mesoderm Zelda replicate `r m.zelda$replicate[1]` and dorsal ectoderm Zelda replicate `r de.zelda$replicate[1]` were combined and filtered for those having Zelda enrichment of at least 2-fold over WCE in either tissue, resulting in `r pn(length(zelda.gr))` total Zelda peaks.
+
+## Classify Zelda peaks and known enhancers
+
+```{r measure_k27me3_at_zelda_peaks}
+
+m.k27  <- enrichment_values("m",  "h3k27me3", "best", enrichments.df)
+de.k27 <- enrichment_values("de", "h3k27me3", "best", enrichments.df)
+
+k27_meso_sample <- subset(samples.df, factor == "h3k27me3" & tissue == "m" & replicate == m.k27$replicate[1])$sample
+k27_de_sample   <- subset(samples.df, factor == "h3k27me3" & tissue == "de" & replicate == de.k27$replicate[1])$sample
+
+zelda.gr <- cache("zelda.gr", function() {
+
+  k27_regions.gr <- resize(zelda.gr, width=1001, fix="center")
+  zelda.gr$meso_k27me3 <- calculate_enrichment(k27_regions.gr, k27_meso_sample)
+  zelda.gr$de_k27me3   <- calculate_enrichment(k27_regions.gr, k27_de_sample)
+  
+  zelda.gr$has_k27me3_meso <- ifelse(zelda.gr$meso_k27me3 > 1, "Yes", "No")
+  zelda.gr$has_k27me3_de <- ifelse(zelda.gr$de_k27me3 > 1, "Yes", "No")
+  
+  zelda.gr  
+})
+
+enhancers_with_k27 <- c(subset(m.k27, log2(enrichment) > 1)$enhancer_name, 
+                        subset(de.k27, log2(enrichment) > 1)$enhancer_name) %>% unique
+
+zelda_regions_with_k27 <- subset(zelda.gr, has_k27me3_meso == "Yes" | has_k27me3_de == "Yes")$name
+```
+
+## Calculate distance to nearest PRE 
+
+```{r calculate_pre_distances}
+
+dtn <- distanceToNearest(enhancers.gr, pre.gr, ignore.strand=TRUE)
+enhancers.gr$pre_distance <- NA
+enhancers.gr$pre_distance[queryHits(dtn)] <- mcols(dtn)$distance
+enhancers.gr$pre_peak_name <- "None"
+enhancers.gr$pre_peak_name[queryHits(dtn)] <- pre.gr$name[subjectHits(dtn)]
+
+dtn <- distanceToNearest(zelda.gr, pre.gr, ignore.strand=TRUE)
+zelda.gr$pre_distance <- NA
+zelda.gr$pre_distance[queryHits(dtn)] <- mcols(dtn)$distance
+
+```
+
+## Plot results
+
+```{r pre_distance_boxplot, fig.width=5, fig.height=7, dev=c("png", "pdf")}
+
+e.df <- enhancers.gr %>%
+        as.data.frame %>%
+        mutate(k27me3 = ifelse(enhancer_name %in% enhancers_with_k27, "high", "low"),
+               group = "DV enhancers")
+
+saveRDS(e.df, file=figure_path("enhancers_with_pre.df.rds"))
+
+z.df <- zelda.gr %>%
+        as.data.frame %>%
+        mutate(k27me3 = ifelse(name %in% zelda_regions_with_k27, "high", "low"),
+               group = "Zld-bound regions")
+
+both.df <- rbind(select(e.df, pre_distance, group, k27me3),
+                 select(z.df, pre_distance, group, k27me3))
+
+both.df$k27me3 %<>% factor(levels=c("low", "high"))
+
+g <- ggplot(both.df, aes(x=k27me3, y=pre_distance / 1000000)) +
+     geom_boxplot(outlier.size=0.5, fill="#8DC449") +
+     facet_wrap(~ group, nrow=1) +
+     theme_manuscript() +
+     labs(x="", y="Distance to nearest PRE (Mb)\n")
+g
+```
+
+``` {r pre_distance_statistics}
+
+both.df %>% group_by(group, k27me3) %>%
+  summarize(count = n()) %>%
+  pander(caption="Region counts")
+
+wc_test <- wilcox.test(x = subset(e.df, k27me3 == "high")$pre_distance, 
+                       y = subset(e.df, k27me3 == "low")$pre_distance,
+                       alternative = "two.sided",
+                       paired=FALSE)
+data_frame(Test="Known enhancers low vs high K27me3 (Wilcoxon)", pvalue=wc_test$p.value) %>% pander
+
+wc_test <- wilcox.test(x = subset(z.df, k27me3 == "high")$pre_distance, 
+                       y = subset(z.df, k27me3 == "low")$pre_distance,
+                       alternative = "two.sided",
+                       paired=FALSE)
+data_frame(Test="Zelda-bound regions low vs high K27me3 (Wilcoxon)", pvalue=wc_test$p.value) %>% pander
+```
+
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

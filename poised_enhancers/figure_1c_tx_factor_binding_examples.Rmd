@@ -1,0 +1,168 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(GenomicFeatures)
+library(TxDb.Dmelanogaster.UCSC.dm3.ensGene)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+library(rtracklayer)
+library(magrittr)
+library(dplyr)
+library(readr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_1c_tx_factor_binding_examples")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/enhancers.r")
+source("shared_code/samples.r")
+source("shared_code/gviz.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Known enhancer example figures
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r bigwigs}
+
+enrichments.df <- readRDS("calculate_enrichments_at_known_enhancers/enrichments.df.rds")
+
+best_replicate_rpm_bigwig <- function(factor_name, tissue_name) {
+  replicate_number <- enrichment_values(tissue_name, factor_name, replicate="best", enrichments.df)$replicate[1]
+  sample_name <- subset(samples.df, tissue == tissue_name & replicate == replicate_number & factor == factor_name)$sample
+  sample_bigwig(sample_name, bigwig="ip", type="rpm")
+}
+
+factors.rpm <- list("Mad"=best_replicate_rpm_bigwig("mad", "de"),
+                    "Zen"=best_replicate_rpm_bigwig("zen", "de"),
+                    "Zld (de)"=best_replicate_rpm_bigwig("zld", "de"),
+                    "Zld (m)"=best_replicate_rpm_bigwig("zld", "m"),
+                    "Dl"=best_replicate_rpm_bigwig("dl", "m"),
+                    "Twi"=best_replicate_rpm_bigwig("twi", "m"))
+
+factors.colors <- list("Mad"="#F8AF53",
+                       "Zen"="#F8AF53",
+                       "Dl"="#4C5699",
+                       "Twi"="#4C5699",
+                       "Zld (m)"="#8DC449",
+                       "Zld (de)"="#8DC449")
+
+enhancers.gr$name <- enhancers.gr$enhancer_name
+enhancers.gr$collapse <- FALSE
+
+e_5kb.gr <- resize(enhancers.gr, width=5000, fix="center")
+
+```
+
+``` {r common}
+
+build_factor_track <- function(factor_name, bigwig, region.gr, factor_color, max_value=NA) {
+  if(is.na(max_value)) {
+    message("Max value for ", factor_name, " not provided")
+    max_value <- max_value(bigwig, region.gr)
+  }
+  
+  gviz_data_track(bigwig, factor_name, factor_color, max_value)
+}
+
+plot_region <- function(region.gr, 
+                        factor_bws, factor_limits, factor_colors,
+                        enhancers.gr, include_factors=TRUE) {
+
+  message("Building: ", region.gr$name)
+  stopifnot(length(region.gr) == 1)
+  
+  r_chr <- as.character(seqnames(region.gr))
+  r_start <- start(region.gr)
+  r_end   <- end(region.gr)
+  
+  collapse_txs <- region.gr$collapse
+  
+  grtrack <- GeneRegionTrack(range=TxDb.Dmelanogaster.UCSC.dm3.ensGene,
+                             genome="dm3",
+                             chromosome=r_chr,
+                             name="Genes",
+                             showId=FALSE,
+                             geneSymbol=TRUE,
+                             fill="black", collapseTranscripts=collapse_txs)
+
+  e.gr <- enhancers.gr[seqnames(enhancers.gr) == r_chr]
+  e.gr$feature <- "enhancer"
+  e.gr$id <- e.gr$name
+  enhancers_track <- AnnotationTrack(range=e.gr, strand=rep("*", length(e.gr)),
+                                     genome="dm3", name="Enhancers", showFeatureId=TRUE,
+                                     stacking="dense", fill="black", fontsize=9)
+  
+  factor_tracks <- names(factor_bws) %>%
+                   lapply(function(factor_name) {
+                     build_factor_track(factor_name, factor_bws[[factor_name]], region.gr, 
+                                        factor_colors[[factor_name]], factor_limits[[factor_name]])
+                   })
+
+  list(gene_track=grtrack, axis_track=GenomeAxisTrack(), data_tracks=factor_tracks, enhancers_track=enhancers_track, 
+       region_chr=r_chr, region_start=r_start, region_end=r_end, region_name=region.gr$name)
+}
+
+track_list <- function(track_list) {
+  c(list(track_list$axis_track), track_list$data_tracks, list(track_list$enhancers_track, track_list$gene_track))
+}
+
+```
+
+``` {r build_figures, message=FALSE}
+
+selected_enhancers <- c("zen_dist_Doyle", "dpp_Huang", "tld_Kirov", "sna_Ip", "Mef2_Nguyen", "tup_Zeitlinger")
+
+f1_factor_limits <- list("Mad"=NA,
+                         "Zen"=NA,
+                         "Dl"=NA,
+                         "Twi"=NA,
+                         "Zld (m)"=NA,
+                         "Zld (de)"=NA)
+
+plots <- cache("plots", function() {
+  group.gr <- e_5kb.gr[e_5kb.gr$name %in% selected_enhancers]
+  
+  factor_limits <- factors.rpm %>%
+                   lapply(function(bigwig) {
+                     max(regionMaxs(group.gr, bigwig))
+                   })
+  
+  seq_along(group.gr) %>%
+    lapply(function(i) {
+      plot_region(group.gr[i],
+                  factors.rpm, factor_limits, factors.colors, enhancers.gr)
+    })  
+}, cache=FALSE)
+
+```
+
+``` {r display_figures, fig.width=28, fig.height=55, dev=c("pdf"), message=FALSE}
+
+export_plot_pdf <- function(track, plot_base) {
+  file <- figure_path(paste0(track$region_name, plot_base, ".pdf"))
+  pdf(file, width=28, height=45)
+
+  message("Plotting: ", track$region_name)
+  
+  tracklist <- track_list(track)
+  
+  sizes <- c(0.2, rep(1, times=length(tracklist) - 3), 0.2, 0.2)
+  
+  plotTracks(tracklist,
+             sizes=sizes,
+             chromosome=track$region_chr,
+             from=track$region_start,
+             to=track$region_end,
+             main=track$region_name,
+             cex.title=1.5, col.title="black", col.axis="black",
+             fontcolor.legend="black", cex.legend=0.5) 
+  dev.off()  
+}
+
+nothing <- plots %>% lapply(export_plot_pdf, "_5kb_region_figure1")
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

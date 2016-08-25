@@ -1,0 +1,176 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(GenomicFeatures)
+library(TxDb.Dmelanogaster.UCSC.dm3.ensGene)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+library(rtracklayer)
+library(magrittr)
+library(dplyr)
+library(readr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_3c_h3k27me3_examples")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+source("shared_code/enhancers.r")
+source("shared_code/gviz.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Known enhancer example figures: K27me3
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+``` {r bigwigs}
+
+histones.enrichment <- list("H3K27me3"=list(meso = sample_bigwig("tl10b_h3k27me3_1", bigwig="enrichment"),
+                                            de   = sample_bigwig("gd7_h3k27me3_1", bigwig="enrichment")))
+
+histones.colors <- list(meso="#4B549B", de="#FAB049")
+
+enhancers.gr$name <- enhancers.gr$enhancer_name
+enhancers.gr$collapse <- FALSE
+
+e_5kb.gr <- resize(enhancers.gr, width=5000, fix="center")
+e_30kb.gr <- resize(enhancers.gr, width=30000, fix="center")
+
+```
+
+``` {r common}
+
+build_histone_track <- function(bigwigs, histone, region.gr, histone_colors, max_value=NA) {
+  meso.bw <- bigwigs$meso
+  de.bw   <- bigwigs$de
+  
+  if(is.na(max_value)) {
+    message("Max value for ", histone, " not provided")
+    max_value <- pmax(max_value(meso.bw, region.gr), max_value(de.bw, region.gr))
+  }
+    
+  track_name <- histone
+  gviz_dual_data_track(meso.bw, de.bw, region.gr, track_name, histone_colors, max_value)
+}
+
+plot_region <- function(region.gr, 
+                        histone_bws, histone_limits, histone_colors,
+                        enhancers.gr) {
+
+  if(is.na(histone_limits)) {
+    histone_limits <- as.list(rep(NA, times=length(histone_bws)))
+    names(histone_limits) <- names(histone_bws)
+  }
+  
+  message("Building: ", region.gr$name)
+  stopifnot(length(region.gr) == 1)
+  
+  r_chr <- as.character(seqnames(region.gr))
+  r_start <- start(region.gr)
+  r_end   <- end(region.gr)
+  
+  collapse_txs <- region.gr$collapse
+  
+  grtrack <- GeneRegionTrack(range=TxDb.Dmelanogaster.UCSC.dm3.ensGene,
+                             genome="dm3",
+                             chromosome=r_chr,
+                             name="Genes",
+                             showId=FALSE,
+                             geneSymbol=TRUE,
+                             fill="black", collapseTranscripts=collapse_txs)
+
+  e.gr <- enhancers.gr[seqnames(enhancers.gr) == r_chr]
+  e.gr$feature <- "enhancer"
+  e.gr$id <- e.gr$name
+  enhancers_track <- AnnotationTrack(range=e.gr, strand=rep("*", length(e.gr)),
+                                     genome="dm3", name="Enhancers", showFeatureId=TRUE,
+                                     stacking="dense", fill="black", fontsize=9)
+  
+  pre.gr <- readRDS("figure_3d_zelda_and_polycomb/pre.gr.rds")
+  pre.gr <- pre.gr[seqnames(pre.gr) == r_chr]
+  pre.gr$feature <- "PRE"
+  pre.gr$id <- pre.gr$name
+  
+  pre_track <- AnnotationTrack(range=pre.gr, strand=rep("*", length(pre.gr)),
+                               genome="dm3", name="PREs", showFeatureId=FALSE,
+                               stacking="dense", fill="blue", fontsize=5)
+  
+  activity_colors <- c("m"="#4B549B", "de"="#FAB049")
+  
+  histone_tracks <- names(histone_bws) %>%
+                    lapply(function(histone) {
+                      build_histone_track(histone_bws[[histone]], histone, region.gr,
+                                          histone_colors, histone_limits[[histone]])
+                    })
+
+  list(gene_track=grtrack, axis_track=GenomeAxisTrack(), data_tracks=histone_tracks, enhancers_track=enhancers_track, 
+       pre_track=pre_track,
+       region_chr=r_chr, region_start=r_start, region_end=r_end, region_name=region.gr$name)
+}
+
+track_list <- function(track_list) {
+  c(list(track_list$axis_track), track_list$data_tracks, list(track_list$enhancers_track, track_list$pre_track, track_list$gene_track))
+}
+
+```
+
+``` {r build_figures, message=FALSE}
+
+# 5kb
+#enhancers_f1_group1 <- c("sna_Ip", "dpp_Huang", "tld_Kirov", "tup_Zeitlinger", "zen_dist_Doyle")
+#enhancers_f1_group2 <- c("Mef2_Ozdemir", "Mef2_Nguyen")
+
+# 5kb
+#enhancers_f2_group1 <- c("zen_dist_Doyle", "dpp_Huang", "tld_Kirov", "tup_Zeitlinger", "pnr_Zeitlinger")
+#enhancers_f2_group2 <- c("sna_Ip", "twi_Jiang", "twi_Ozdemir", "htl_Stathopoulos", "Mef2_Ozdemir", "Mef2_Nguyen", "tin_Yin")
+
+# 30kb
+#enhancers_f3_group1 <- c("zen_dist_Doyle", "dpp_Huang", "tld_Kirov", "tup_Zeitlinger", 
+#                         "pnr_Zeitlinger", "Mef2_Ozdemir", "Mef2_Nguyen", "wntD_Zeitlinger", "Ilp4_Stathopoulos")
+#enhancers_f3_group2 <- c("twi_Jiang", "tin_Yin")
+
+#all_enhancers <- c(enhancers_f1_group1, enhancers_f1_group2, enhancers_f2_group1, enhancers_f2_group2, enhancers_f3_group1, enhancers_f3_group2) %>% unique
+
+all_enhancers <- c("dpp_Huang", "tup_Zeitlinger", "twi_Jiang", "tin_Yin", "Ilp4_Stathopoulos", "tld_Kirov")
+
+all_plots <- cache("all_plots", function() {
+  group.gr <- e_30kb.gr[e_30kb.gr$name %in% all_enhancers]
+  seq_along(group.gr) %>%
+    lapply(function(i) {
+      plot_region(group.gr[i],
+                  histones.enrichment, histone_limits=NA, histones.colors,
+                  enhancers.gr)
+    })  
+}, cache=FALSE)
+
+```
+
+``` {r display_figures, fig.width=28, fig.height=26, dev=c("pdf"), message=FALSE}
+
+export_plot_pdf <- function(track, plot_base) {
+  file <- figure_path(paste0(track$region_name, plot_base, ".pdf"))
+  pdf(file, width=28, height=26)
+
+  message("Plotting: ", track$region_name)
+  
+  tracklist <- track_list(track)
+  
+  sizes <- c(0.2, rep(1, times=length(tracklist) - 4), 0.2, 0.2, 0.2)
+  
+  plotTracks(tracklist,
+             sizes=sizes,
+             chromosome=track$region_chr,
+             from=track$region_start,
+             to=track$region_end,
+             main=track$region_name,
+             cex.title=1.5, col.title="black", col.axis="black",
+             fontcolor.legend="black", cex.legend=0.5) 
+  dev.off()  
+}
+
+nothing <- all_plots %>% lapply(export_plot_pdf, "_k27me3")
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

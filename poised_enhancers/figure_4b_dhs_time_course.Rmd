@@ -1,0 +1,82 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_4b_dhs_time_course")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/enhancers.r")
+source("shared_code/import.r")
+source("shared_code/ggplot_theme.r")
+source("shared_code/dhs.r")
+```
+
+# Figure 4b: DHS signal at enhancers over time
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Figure 4b
+
+``` {r build_dhs_timecourse_plot}
+
+add_dhs_score <- function(stage, dhs.bws, gr) {
+  gr$dhs_stage <- stage
+  gr$dhs_score <- log2(regionMeans(gr, dhs.bws[[stage]]) + 1)
+  gr
+}
+
+dhs.bws <- dhs_bigwigs()
+
+dhs_known <- lapply(names(dhs.bws), add_dhs_score, dhs.bws, enhancers.gr) %>%
+             lapply(as.data.frame) %>%
+             bind_rows
+
+dhs_known$dhs_stage %<>% gsub("S", "", .)
+dhs_known$dhs_stage %<>% factor(levels=c("5", "9", "10", "11", "14"))
+
+saveRDS(dhs_known, file=figure_path("dhs_known.rds"))
+
+g <- ggplot(dhs_known, aes(x=dhs_stage, y=dhs_score)) +
+     geom_boxplot(outlier.size=0.5) +
+     scale_y_continuous(expand=c(0, 0.1), limits=c(0, NA)) +
+     theme_manuscript() +
+     labs(x="\nEmbryonic stage", y="Average DHS score (log2)\n")
+```
+
+``` {r display_dhs_timecourse_plot, fig.width=6, fig.height=5, dev=c("png", "pdf")}
+g
+```
+
+``` {r dhs_timecourse_statistics}
+
+pvalue_stage_9_vs_10 <- function(scores, stages, region_names) {
+  scores.df <- data_frame(region_names[stages == "9"],
+                          score9=scores[stages == "9"])
+  
+  scores.df %<>% merge(data_frame(region_names[stages == "10"],
+                                  score10=scores[stages == "10"]))
+
+  wilcox.test(x = scores.df$score9,
+              y = scores.df$score10,
+              alternative = "two.sided",
+              paired = TRUE)$p.value
+}
+
+stages.df <- dhs_known %>%
+             select(enhancer_name, dhs_stage, dhs_score) %>%
+             filter(dhs_stage %in% c("9", "10")) %>%
+             mutate(dhs_stage = paste0("S", dhs_stage)) %>%
+             spread(dhs_stage, dhs_score) %>%
+             summarize(n = n(),
+                       wilcoxon_pvalue = wilcox.test(x = S9, y = S10, alternative = "two.sided", paired=TRUE)$p.value)
+
+stages.df %>% pander(caption="Stage 9 vs 10 (paired)")
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

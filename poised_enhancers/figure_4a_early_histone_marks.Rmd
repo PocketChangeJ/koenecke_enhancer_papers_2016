@@ -1,0 +1,100 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+
+# Output folder for this document
+options(knitr.figure_dir = "figure_4a_early_histone_marks")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/enhancers.r")
+source("shared_code/ggplot_theme.r")
+```
+
+# Early histone marks at DV enhancers
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+This figure shows the average ChIP signal per base at our known DV enhancers for histone modifications selected from the Eisen lab's early embryo time course ([Li eLife 2014](http://dx.doi.org/10.7554/eLife.03737)).
+
+Each enhancer was first resized to 1,001 bp around its center.
+
+Normalized data files were downloaded in WIG format from [GSE58935](http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE58935) and converted to BigWig.
+
+``` {r obtain_histone_timecourse_values}
+
+bws <- list("H3K4me1"=c(cc8="GSM1424904_Dmel-H3K4me1-c8.bw",
+                        cc12="GSM1424905_Dmel-H3K4me1-c12.bw",
+                        cc14a="GSM1424906_Dmel-H3K4me1-c14a.bw",
+                        cc14c="GSM1424907_Dmel-H3K4me1-c14c.bw"),
+            "H3K27ac"=c(cc8="GSM1424900_Dmel-H3K27ac-c8.bw",
+                        cc12="GSM1424901_Dmel-H3K27ac-c12.bw",
+                        cc14a="GSM1424902_Dmel-H3K27ac-c14a.bw",
+                        cc14c="GSM1424903_Dmel-H3K27ac-c14c.bw"),
+            "H3K27me3"=c(cc12="GSM1424916_Dmel-H3K27me3-c12.bw",
+                         cc14a="GSM1424917_Dmel-H3K27me3-c14a.bw",
+                         cc14c="GSM1424918_Dmel-H3K27me3-c14c.bw")) %>%
+       lapply(function(l1) {
+         l1 %>% sapply(function(filename) {
+           data_path(file.path("li_elife_2014", filename))
+         })
+       })
+
+enhancers.gr <- resize(enhancers.gr, width=1001, fix="center") %>%
+                granges
+
+enhancers.gr$group <- "DV enhancers"
+
+closed.gr <- readRDS("figure_1b_transcription_factor_boxplots/late_dhs_with_k27ac.gr.rds") %>%
+             resize(width=1001, fix="center") %>%
+             granges
+
+closed.gr$group <- "Closed regions"
+
+enhancers.gr <- c(enhancers.gr, closed.gr)
+
+histones.df <- names(bws) %>%
+               lapply(function(histone_name) {
+                 histone_bws <- bws[[histone_name]]
+                 
+                 timepoints.df <- names(histone_bws) %>%
+                                  mclapply(function(tp) {
+                                    enhancers.gr$histone_signal <- regionSums(enhancers.gr, histone_bws[[tp]])
+                                    enhancers.gr$timepoint      <- tp
+                                    as.data.frame(enhancers.gr)
+                                  }) %>%
+                                  bind_rows
+                 timepoints.df$histone <- histone_name
+                 timepoints.df
+               }) %>%
+               bind_rows
+
+```
+
+``` {r build_plot, warning=FALSE, fig.cap="", fig.width=5, fig.height=10, dev=c("png", "pdf")}
+
+histones.df$timepoint <- factor(histones.df$timepoint, levels=names(bws$H3K4me1))
+histones.df$histone <- factor(histones.df$histone, levels=c("H3K27ac", "H3K4me1", "H3K27me3"))
+
+g <- histones.df %>%
+     filter(group != "Closed regions") %>% 
+     ggplot(aes(x=timepoint, y=histone_signal / 1001)) +
+       geom_boxplot() +
+       facet_wrap(~ histone, nrow=3, scales="free_y") +
+       geom_hline(yintercept=0, color="black", size=0.5) +
+       scale_y_continuous(expand=c(0, 0)) +
+       theme_bw() +
+       theme_manuscript() +
+       labs(x="Timepoint", y="Average ChIP signal\n",
+            title="Histone signal\nat known DV enhancers\n")
+
+g
+
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+
+<title></title>
+
+<script src="html_include/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="html_include/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="html_include/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="html_include/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="html_include/bootstrap-3.3.5/shim/respond.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<link rel="stylesheet"
+      href="html_include/highlight/default.css"
+      type="text/css" />
+<script src="html_include/highlight/highlight.js"></script>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+<link rel="stylesheet" href="html_include/custom.css" type="text/css" />
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script src="html_include/navigation-1.1/tabsets.js"></script>
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+
+
+<div class="fluid-row" id="header">
+
+
+
+
+</div>
+
+<div id="TOC">
+<ul>
+<li><a href="#replicate-consistency">Replicate consistency</a><ul>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#session-information">Session information</a></li>
+</ul></li>
+</ul>
+</div>
+
+<div id="replicate-consistency" class="section level1">
+<h1>Replicate consistency</h1>
+<p><strong>Project:</strong> Repressed Enhancers</p>
+<p><strong>Author:</strong> <a href="mailto:jjj@stowers.org">Jeff Johnston</a></p>
+<p><strong>Generated:</strong> Mon Aug 15 2016, 12:42 PM</p>
+<div id="overview" class="section level2">
+<h2>Overview</h2>
+<table>
+<caption>Samples with replicates</caption>
+<colgroup>
+<col width="6%" />
+<col width="6%" />
+<col width="11%" />
+<col width="5%" />
+<col width="5%" />
+<col width="8%" />
+<col width="13%" />
+<col width="15%" />
+<col width="28%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">tissue</th>
+<th align="center">factor</th>
+<th align="center">sample</th>
+<th align="center">type</th>
+<th align="center">assay</th>
+<th align="center">replicate</th>
+<th align="center">bigwig</th>
+<th align="center">wce_bigwig</th>
+<th align="center">enrichment_bigwig</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">h3k27ac</td>
+<td align="center">gd7_h3k27ac_1</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">gd7_h3k27ac_1.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">gd7_h3k27ac_1_501bp_linear_enrichment.bw</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">h3k27ac</td>
+<td align="center">gd7_h3k27ac_2</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">gd7_h3k27ac_2.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">gd7_h3k27ac_2_501bp_linear_enrichment.bw</td>
+</tr>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">h3k27me3</td>
+<td align="center">gd7_h3k27me3_1</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">gd7_h3k27me3_1.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">gd7_h3k27me3_1_501bp_linear_enrichment.bw</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">h3k27me3</td>
+<td align="center">gd7_h3k27me3_2</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">gd7_h3k27me3_2.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">gd7_h3k27me3_2_501bp_linear_enrichment.bw</td>
+</tr>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">h3k4me1</td>
+<td align="center">gd7_h3k4me1_1</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">gd7_h3k4me1_1.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">gd7_h3k4me1_1_501bp_linear_enrichment.bw</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">h3k4me1</td>
+<td align="center">gd7_h3k4me1_2</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">gd7_h3k4me1_2.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">gd7_h3k4me1_2_501bp_linear_enrichment.bw</td>
+</tr>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">mad</td>
+<td align="center">gd7_mad_1</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">gd7_mad_1.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">mad</td>
+<td align="center">gd7_mad_2</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">gd7_mad_2.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">zen</td>
+<td align="center">gd7_zen_1</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">gd7_zen_1.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">zen</td>
+<td align="center">gd7_zen_2</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">gd7_zen_2.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">zld</td>
+<td align="center">gd7_zld_1</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">gd7_zld_1.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">zld</td>
+<td align="center">gd7_zld_2</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">gd7_zld_2.bw</td>
+<td align="center">gd7_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">dl</td>
+<td align="center">tl10b_dl_1</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">tl10b_dl_1.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">dl</td>
+<td align="center">tl10b_dl_2</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">tl10b_dl_2.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">h3k27ac</td>
+<td align="center">tl10b_h3k27ac_1</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">tl10b_h3k27ac_1.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">h3k27ac</td>
+<td align="center">tl10b_h3k27ac_3</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">tl10b_h3k27ac_3.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">h3k27me3</td>
+<td align="center">tl10b_h3k27me3_1</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">tl10b_h3k27me3_1.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">h3k27me3</td>
+<td align="center">tl10b_h3k27me3_2</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">tl10b_h3k27me3_2.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">h3k4me1</td>
+<td align="center">tl10b_h3k4me1_1</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">tl10b_h3k4me1_1.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">h3k4me1</td>
+<td align="center">tl10b_h3k4me1_3</td>
+<td align="center">histone</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">tl10b_h3k4me1_3.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">twi</td>
+<td align="center">tl10b_twi_1</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">tl10b_twi_1.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">twi</td>
+<td align="center">tl10b_twi_2</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">tl10b_twi_2.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">zld</td>
+<td align="center">tl10b_zld_1</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">1</td>
+<td align="center">tl10b_zld_1.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">zld</td>
+<td align="center">tl10b_zld_2</td>
+<td align="center">txf</td>
+<td align="center">chipseq</td>
+<td align="center">2</td>
+<td align="center">tl10b_zld_2.bw</td>
+<td align="center">tl10b_combined_wce.bw</td>
+<td align="center">NA</td>
+</tr>
+<tr class="odd">
+<td align="center">we</td>
+<td align="center">atac</td>
+<td align="center">orer_atac_1</td>
+<td align="center">atac</td>
+<td align="center">atacseq</td>
+<td align="center">1</td>
+<td align="center">orer_atac_1.bw</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+<tr class="even">
+<td align="center">we</td>
+<td align="center">atac</td>
+<td align="center">orer_atac_2</td>
+<td align="center">atac</td>
+<td align="center">atacseq</td>
+<td align="center">2</td>
+<td align="center">orer_atac_2.bw</td>
+<td align="center">NA</td>
+<td align="center">NA</td>
+</tr>
+</tbody>
+</table>
+<p>For each of the above replicate pairs, we will sum the total ChIP-seq signal in 1,000 base pair bins across the genome (excluding the following chromosomes: chrU, chrM, chr2LHet, chr2RHet, chr3LHet, chr3RHet, chrXHet, chrYHet, chrUextra) for each replicate, and then calculate a pearson correlation coefficient after excluding bins that have zero signal in both replicates.</p>
+<table style="width:29%;">
+<caption>Pearson correlations across 1000bp bins (bins with at least one non-zero count)</caption>
+<colgroup>
+<col width="16%" />
+<col width="12%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">samples</th>
+<th align="center">pearson</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">de_h3k27ac</td>
+<td align="center">0.9533398</td>
+</tr>
+<tr class="even">
+<td align="center">de_h3k27me3</td>
+<td align="center">0.9730405</td>
+</tr>
+<tr class="odd">
+<td align="center">de_h3k4me1</td>
+<td align="center">0.8212242</td>
+</tr>
+<tr class="even">
+<td align="center">de_mad</td>
+<td align="center">0.9157394</td>
+</tr>
+<tr class="odd">
+<td align="center">de_zen</td>
+<td align="center">0.9710020</td>
+</tr>
+<tr class="even">
+<td align="center">de_zld</td>
+<td align="center">0.9371982</td>
+</tr>
+<tr class="odd">
+<td align="center">m_dl</td>
+<td align="center">0.6409106</td>
+</tr>
+<tr class="even">
+<td align="center">m_h3k27ac</td>
+<td align="center">0.9238053</td>
+</tr>
+<tr class="odd">
+<td align="center">m_h3k27me3</td>
+<td align="center">0.8519814</td>
+</tr>
+<tr class="even">
+<td align="center">m_h3k4me1</td>
+<td align="center">0.7205056</td>
+</tr>
+<tr class="odd">
+<td align="center">m_twi</td>
+<td align="center">0.8202087</td>
+</tr>
+<tr class="even">
+<td align="center">m_zld</td>
+<td align="center">0.8494613</td>
+</tr>
+<tr class="odd">
+<td align="center">we_atac</td>
+<td align="center">0.9824201</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="session-information" class="section level2">
+<h2>Session information</h2>
+<p>For reproducibility, this analysis was performed with the following R/Bioconductor session:</p>
+<pre><code>R version 3.3.1 (2016-06-21)
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+Running under: OS X 10.11.6 (El Capitan)
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] stats4    parallel  stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+ [1] readr_1.0.0                           digest_0.6.10                        
+ [3] yaml_2.1.13                           pander_0.6.0                         
+ [5] BSgenome.Dmelanogaster.UCSC.dm3_1.4.0 BSgenome_1.40.1                      
+ [7] rtracklayer_1.32.2                    Biostrings_2.40.2                    
+ [9] XVector_0.12.1                        GenomicRanges_1.24.2                 
+[11] GenomeInfoDb_1.8.3                    IRanges_2.6.1                        
+[13] S4Vectors_0.10.2                      BiocGenerics_0.18.0                  
+[15] magrittr_1.5                          dplyr_0.5.0                          
+[17] setwidth_1.0-4                       
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_0.12.6                RStudioConsoleRender_0.1.0
+ [3] formatR_1.4                bitops_1.0-6              
+ [5] tools_3.3.1                zlibbioc_1.18.0           
+ [7] evaluate_0.9               tibble_1.1                
+ [9] DBI_0.4-1                  rstudioapi_0.6            
+[11] stringr_1.0.0              knitr_1.13                
+[13] Biobase_2.32.0             R6_2.1.2                  
+[15] XML_3.98-1.4               BiocParallel_1.6.5        
+[17] rmarkdown_1.0.9001         Rsamtools_1.24.0          
+[19] htmltools_0.3.5            GenomicAlignments_1.8.4   
+[21] assertthat_0.1             SummarizedExperiment_1.2.3
+[23] stringi_1.1.1              lazyeval_0.2.0            
+[25] RCurl_1.95-4.8            </code></pre>
+</div>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+$(document).ready(function () {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

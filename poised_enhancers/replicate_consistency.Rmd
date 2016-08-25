@@ -1,0 +1,76 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(dplyr)
+library(magrittr)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+
+# Output folder for this document
+options(knitr.figure_dir = "replicate_consistency")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/samples.r")
+```
+
+# Replicate consistency
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+``` {r samples_table}
+
+cores <- 5
+
+replicates.df <- samples.df %>%
+                 group_by(tissue, factor) %>%
+                 summarize(has_replicates = yesno(n() > 1)) %>%
+                 filter(has_replicates == "Yes") %>%
+                 select(-has_replicates)
+
+reps.df <- merge(samples.df, replicates.df)
+reps.df %>% pander(caption="Samples with replicates")
+```
+
+For each of the above replicate pairs, we will sum the total ChIP-seq signal in 1,000 base pair bins across the genome (excluding the following chromosomes: `r paste(seqnames(Dmelanogaster)[grep("H|U|M", seqnames(Dmelanogaster))], sep=", ")`) for each replicate, and then calculate a pearson correlation coefficient after excluding bins that have zero signal in both replicates.
+
+``` {r calculate_cor}
+
+calculate_correlation <- function(tissue, factor, samples.df, bins.gr) {
+  tissue_ <- tissue
+  factor_ <- factor
+  
+  pair.df <- subset(samples.df, tissue == tissue_ & factor == factor_)
+  stopifnot(nrow(pair.df) > 1)
+
+  bigwig_s1 <- sample_bigwig(pair.df$sample[1])
+  bigwig_s2 <- sample_bigwig(pair.df$sample[2])
+  
+  s1 <- regionSums(bins.gr, bigwig_s1)
+  s2 <- regionSums(bins.gr, bigwig_s2)
+  
+  zeros <- (s1 + s2) == 0
+  
+  if(length(zeros) > 0) {
+    s1 <- s1[-zeros]
+    s2 <- s2[-zeros]
+  }
+  
+  data_frame(samples=paste0(tissue, "_", factor), pearson=cor(s1, s2))
+}
+
+bins.gr <- seqlengths(Dmelanogaster) %>%
+           tileGenome(tilewidth=1000, cut.last=TRUE) %>%
+           filter_chrs
+
+cors.df <- 1:nrow(replicates.df) %>%
+           mclapply(function(i) {
+             calculate_correlation(replicates.df$tissue[i], replicates.df$factor[i], samples.df, bins.gr)
+           }, mc.cores=cores, mc.preschedule=FALSE) %>%
+           bind_rows
+cors.df %>% pander(caption="Pearson correlations across 1000bp bins (bins with at least one non-zero count)")
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```
+ 

@@ -1,0 +1,479 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+
+# Output folder for this document
+options(knitr.figure_dir = "additional_processing")
+
+source("shared_code/knitr_common.r")
+knitr::opts_chunk$set(echo=TRUE, eval=FALSE)
+```
+
+# Additional data processing
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+This document describes additional data processing steps performed for one or both manuscripts.
+
+## FlyBase genes
+
+Flybase release 5.57 annotations:
+   
+   * [dmel-all-no-analysis-r5.57.gff.gz](ftp://ftp.flybase.net/releases/FB2014_03/dmel_r5.57/gff/dmel-all-no-analysis-r5.57.gff.gz)
+   * [fbgn_annotation_ID_fb_2014_03.tsv.gz](http://fb2014_03.flybase.org/static_pages/downloads/FB2014_03/genes/fbgn_annotation_ID_fb_2014_03.tsv.gz)
+
+A list of transcripts was generated using the R script found in `flybase/create_transcript_list.r`.
+
+## UCSC dm3 genome Bowtie index
+
+```bash
+mkdir /data/chipseq/genome
+wget 'http://hgdownload.cse.ucsc.edu/goldenPath/dm3/bigZips/chromFa.tar.gz'
+tar xf chromFa.tar.gz
+cat *.fa > dm3.fa
+rm chr*.fa
+bowtie-build dm3.fa dm3
+```
+
+## ChIP-seq alignment
+
+```{bash chipseq_alignment_prep}
+cd /data/chipseq
+mkdir bam
+mkdir bigwigs
+mkdir rds
+```
+
+**Note**: NextSeq samples (all Zelda ChIP-seq samples) were trimmed to 50bp before alignment.
+
+```{bash chipseq_alignment}
+cd /data/chipseq
+parallel -uj 1 /data/analysis/enhancer_papers/scripts/align_chipseq.sh {} ::: `ls fastq/*.fastq.gz | grep -v zld`
+parallel -uj 1 /data/analysis/enhancer_papers/scripts/align_nextseq_chipseq.sh {} ::: `ls fastq/*zld*.fastq.gz`
+
+cd /data/chipseq/bam
+parallel -uj 2 /data/analysis/enhancer_papers/scripts/sort_bam {} ::: *.bam
+
+cd /data/chipseq/rds
+parallel -uj 3 /data/analysis/enhancer_papers/scripts/process_bam.r -f {} -e auto ::: ../bam/*.bam
+mv *.bw ../bigwigs
+```
+
+## ATAC-seq alignment
+
+```{bash atacseq_alignment}
+cd /data/atacseq
+mkdir bam
+parallel -uj 1 /data/analysis/enhancer_papers/scripts/align_atacseq.sh {} ::: fastq/*.fastq.gz
+cd bam
+parallel -uj 1 /data/analysis/enhancer_papers/scripts/sort_bam {} ::: *.bam
+```
+
+## MACS2 peak calling
+
+```{bash macs2_peak_calling, eval=FALSE}
+# installation
+sudo pip install MACS2==2.1.0.20150420
+
+cd /data/chipseq/bam
+samtools merge tl10b_combined_wce.bam tl10b_wce_[2345].bam
+samtools merge gd7_combined_wce.bam gd7_wce_*.bam
+
+mkdir /data/macs
+cd /data/macs
+
+# broad peak calling
+parallel -uj 4 macs2 callpeak -t {} -c /data/chipseq/bam/tl10b_combined_wce.bam -g dm -n \`basename {} .bam\` --keep-dup=all --broad ::: /data/chipseq/bam/tl10b_h3k27*.bam
+parallel -uj 4 macs2 callpeak -t {} -c /data/chipseq/bam/gd7_combined_wce.bam   -g dm -n \`basename {} .bam\` --keep-dup=all --broad ::: /data/chipseq/bam/gd7_h327*.bam
+
+# standard peak calling
+parallel -uj 4 macs2 callpeak -t {} -c /data/chipseq/bam/tl10b_combined_wce.bam -g dm -n \`basename {} .bam\` --keep-dup=all ::: \ 
+    /data/chipseq/bam/tl10b_h3k4me1*.bam \
+    /data/chipseq/bam/tl10b_dl*.bam \
+    /data/chipseq/bam/tl10b_twi*.bam \
+    /data/chipseq/bam/tl10b_zld*.bam
+    
+parallel -uj 4 macs2 callpeak -t {} -c /data/chipseq/bam/gd7_combined_wce.bam   -g dm -n \`basename {} .bam\` --keep-dup=all  ::: \
+    /data/chipseq/bam/gd7_h3k4me1*.bam \
+    /data/chipseq/bam/gd7_mad*.bam \
+    /data/chipseq/bam/gd7_zen*.bam \
+    /data/chipseq/bam/gd7_zld*.bam
+
+parallel -uj 2 macs2 callpeak -t {} -c /data/chipseq/bam/orer_wce_1.bam  -g dm -n \`basename {} .bam\` --keep-dup=all ::: \
+    /data/chipseq/bam/orer_gaf_1.bam \
+    /data/chipseq/bam/orer_pc_1.bam \
+    /data/chipseq/bam/orer_sna_1.bam
+
+# ATAC-seq peak calling
+
+mkdir /data/atacseq/macs
+cd /data/atacseq/macs
+macs2 callpeak -t ../bam/orer_atac_combined.bam -g dm -n orer_atac_combined -f BAMPE --call-summits
+
+```
+
+## Peakzilla peak calling
+
+```{bash peakzilla}
+mkdir /data/chipseq/bed
+cd /data/chipseq/bed
+parallel -uj 8 bamToBed -i {} \> \`basename {} bam\`bed ::: \
+  ../bam/*combined_wce.bam \
+  ../bam/orer_nej_1.bam \
+  ../bam/orer_wce_1.bam \
+  ../bam/*mad*.bam \
+  ../bam/*zen*.bam \
+  ../bam/*twi*.bam \
+  ../bam/*dl*.bam
+
+mkdir /data/peakzilla
+cd /data/peakzilla
+git clone 'https://github.com/steinmann/peakzilla.git'
+
+parallel -uj 2 python peakzilla/peakzilla.py -l \`basename {} bed\`log {} /data/chipseq/bed/gd7_combined_wce.bed \> \`basename {} bed\`tsv ::: \
+  /data/chipseq/bed/*mad*.bed \
+  /data/chipseq/bed/*zen*.bed
+
+parallel -uj 2 python peakzilla/peakzilla.py -l \`basename {} bed\`log {} /data/chipseq/bed/tl10b_combined_wce.bed \> \`basename {} bed\`tsv ::: \
+  /data/chipseq/bed/*dl*.bed \
+  /data/chipseq/bed/*twi*.bed
+
+python peakzilla/peakzilla.py -l orer_nej_1.log /data/chipseq/bed/orer_nej_1.bed /data/chipseq/bed/orer_wce_1.bed > orer_nej_1.tsv
+
+```
+
+## Build combined WCE BigWigs
+
+```{r build_combined_wce_bigwigs}
+source("shared_code/granges_common.r")
+
+combine_granges <- function(tissue, granges, output_name) {
+  grl <- mclapply(granges[grep(tissue, granges)], load_object, mc.cores=3)
+  gr <- do.call(c, grl)
+  export(coverage(gr), data_path(paste0("chipseq/bigwigs/", tissue, "_combined_wce.bw")))
+}
+
+wce_granges <- list.files(data_path("chipseq/rds", "wce_.\\.granges\\.rds$", full.names=TRUE))
+tissues <- c("tl10b", "gd7")
+nothing <- mclapply(tissues, combine_granges, wce_granges, mc.cores=2)
+                                                    
+```
+
+## RNA-seq alignment and differential expression
+
+```{bash rnaseq}
+mkdir /data/download
+mkdir /data/software
+
+cd /data/download
+wget 'http://cole-trapnell-lab.github.io/cufflinks/assets/downloads/cufflinks-2.2.1.Linux_x86_64.tar.gz'
+wget 'http://ccb.jhu.edu/software/tophat/downloads/tophat-2.0.14.Linux_x86_64.tar.gz'
+
+cd /data/software
+tar xf ../download/software/cufflinks*
+mv 'cufflinks-2.2.1.Linux_x86_64' cufflinks
+tar xf ../download/tophat*
+mv 'tophat-2.0.14.Linux_x86_64' tophat
+
+mkdir /data/flybase
+cd /data/flybase
+wget 'ftp://ftp.flybase.net/releases/FB2014_03/dmel_r5.57/fasta/dmel-all-chromosome-r5.57.fasta.gz'
+wget 'ftp://ftp.flybase.net/releases/FB2014_03/dmel_r5.57/gff/dmel-all-no-analysis-r5.57.gff.gz'
+gunzip *.gz
+
+bowtie2-build dmel-all-chromosome-r5.57.fasta fb557
+/data/software/cufflinks/gffread -T -o fb557_genes.gtf dmel-all-no-analysis-r5.57.gff 
+/data/software/tophat/tophat -G fb557_genes.gtf --transcriptome-index transcriptome/fb_genes fb557
+```
+
+RNA-seq sample processing:
+
+```{bash rnaseq_sample_processing}
+cd /data/rnaseq
+parallel -uj 1 /data/analysis/enhancer_papers/scripts/run_tophat.sh {} ::: /data/rnaseq/fastq/*.fastq.gz
+parallel -uj 3 /data/analysis/enhancer_papers/scripts/run_cuffqaunt.sh {} ::: tophat/*
+/data/analysis/enhancer_papers/scripts/run_cuffdiff.sh
+```
+
+## DnaseI hypersensitive sites
+
+DHS data was downloaded to `/data/dhs/` from UCSC:
+
+http://hgdownload.cse.ucsc.edu/goldenPath/dm3/database/bdtnpDnaseAccS5.txt.gz
+http://hgdownload.cse.ucsc.edu/goldenPath/dm3/database/bdtnpDnaseAccS9.txt.gz
+http://hgdownload.cse.ucsc.edu/goldenPath/dm3/database/bdtnpDnaseAccS10.txt.gz
+http://hgdownload.cse.ucsc.edu/goldenPath/dm3/database/bdtnpDnaseAccS11.txt.gz
+http://hgdownload.cse.ucsc.edu/goldenPath/dm3/database/bdtnpDnaseAccS14.txt.gz
+http://hgdownload.cse.ucsc.edu/gbdb/dm3/bdtnp/bdtnpDnaseS5R9481.bw
+http://hgdownload.cse.ucsc.edu/gbdb/dm3/bdtnp/bdtnpDnaseS9R9127.bw
+http://hgdownload.cse.ucsc.edu/gbdb/dm3/bdtnp/bdtnpDnaseS10R8816.bw
+http://hgdownload.cse.ucsc.edu/gbdb/dm3/bdtnp/bdtnpDnaseS11R9485.bw
+http://hgdownload.cse.ucsc.edu/gbdb/dm3/bdtnp/bdtnpDnaseS14R9477.bw
+
+## Early embryo H3K27ac and H3K4me1 data
+
+The following processed data files were downloaded to `/data/li_elife_2014` from GEO GSE58935:
+
+  - `GSM1424900_Dmel-H3K27ac-c8.wig.gz`
+  - `GSM1424901_Dmel-H3K27ac-c12.wig.gz`
+  - `GSM1424902_Dmel-H3K27ac-c14a.wig.gz`
+  - `GSM1424903_Dmel-H3K27ac-c14c.wig.gz`
+  - `GSM1424904_Dmel-H3K4me1-c8.wig.gz`
+  - `GSM1424905_Dmel-H3K4me1-c12.wig.gz`
+  - `GSM1424906_Dmel-H3K4me1-c14a.wig.gz`
+  - `GSM1424907_Dmel-H3K4me1-c14c.wig.gz`
+  - `GSM1424916_Dmel-H3K27me3-c12.wig.gz`
+  - `GSM1424917_Dmel-H3K27me3-c14a.wig.gz`
+  - `GSM1424918_Dmel-H3K27me3-c14c.wig.gz`
+
+Files were converted to BigWig in R:
+
+```{r convert_eisen_data_to_bigwig}
+library(rtracklayer)
+library(parallel)
+library(magrittr)
+
+convert_to_bigwig <- function(wig) {
+  bw_name <- gsub("wig\\.gz$", "bw", wig)
+  message("Importing: ", wig)
+  gr <- import(wig)
+  cov <- coverage(gr, weight="score")
+  message("Saving: ", bw_name)
+  export(cov, bw_name)
+}
+
+files <- list.files(".", "wig\\.gz$")
+
+nothing <- files %>% mclapply(convert_to_bigwig, mc.cores=5, mc.preschedule=FALSE)
+```
+
+## Vienna tiles database
+
+Supplementary Table 1 from [Kvon Nature 2014](http://www.nature.com/nature/journal/v512/n7512/full/nature13395.html) was downloaded and saved as a `csv` file and processed in R:
+
+```{r vienna_tiles}
+csv <- read.csv("2014-01-00083C-Supplementary\ Table\ 1.csv", stringsAsFactors=FALSE)
+
+process_stage <- function(stage_name, csv) {
+  stage_data <- strsplit(csv[, stage_name], split="|", fixed=TRUE)
+  stage.df <- data.frame(stringsAsFactors=FALSE,
+                         VTID=rep(csv$VTID, times=sapply(stage_data, length)),
+                         stage=stage_name,
+                         annotation=unlist(stage_data)) 
+  subset(stage.df, !is.na(annotation))
+}
+
+stages <- names(csv)[grep("^stg", names(csv))]
+
+stages.df <- do.call(rbind, lapply(stages, process_stage, csv))
+
+stages.df$intensity <- gsub("^.*;(.)$", "\\1", stages.df$annotation)
+stages.df$annotation <- gsub(";.$", "", stages.df$annotation)
+
+tiles.df <- csv[, c("VTID", "Chromosome", "Start", "End")]
+names(tiles.df) <- c("VTID", "chr", "start", "end")
+
+stages.df <- merge(tiles.df, stages.df)
+
+saveRDS(tiles.df, file="all_tiles.df.rds")
+saveRDS(stages.df, file="tile_annotations.df.rds")
+```
+
+## Generation of ATAC-seq tracks
+
+```{r generate_atacseq_tracks, eval=FALSE}
+library(GenomicAlignments)
+library(rtracklayer)
+library(magrittr)
+
+dir.create("/data/atacseq/bigwigs")
+
+bam_to_coverage <- function(filename) {
+  readGAlignmentPairs(filename) %>%
+    granges %>%
+    coverage
+}
+
+bam_to_coverage("/data/atacseq/bam/orer_atac_1.bam") %>%
+  export("/data/atacseq/bigwigs/orer_atac_1.bw")
+
+bam_to_coverage("/data/atacseq/bam/orer_atac_2.bam") %>%
+  export("/data/atacseq/bigwigs/orer_atac_2.bw")
+
+```
+
+## Generation of ChIP-seq reads-per-million tracks
+
+```{r chipseq_rpm_tracks, engine="bash", eval=FALSE}
+cd /data/chipseq/bigwigs
+mkdir rpm
+cd rpm
+parallel -uj 3 Rscript /data/analysis/enhancer_papers/scripts/rpm_normalize_bigwig.r -b {} ::: \
+  ../*_zld_*.bw \
+  ../*_dl_*.bw \
+  ../*_twi_*.bw \
+  ../*_mad_*.bw \
+  ../*_zen_*.bw \
+  ../*_sna_*.bw \
+  ../*_nej_*.bw \
+  ../*_h3k27ac_*.bw
+```
+
+## Generation of histone modification enrichment tracks
+
+```{r histone_enrichment_tracks, engine="bash", eval=FALSE}
+cd /data/chipseq/bigwigs
+mkdir enrichment
+cd enrichment
+parallel -uj 1 Rscript /data/analysis/enhancer_papers/scripts/enrichment_track.r -t {} \
+                       -c ../gd7_combined_wce.bw \
+                       -o \`basename {} .bw\`_501bp_linear_enrichment.bw \
+                       -w 501 -l linear \
+                       ::: ../gd7_h3k*.bw 
+
+parallel -uj 1 Rscript /data/analysis/enhancer_papers/scripts/enrichment_track.r -t {} \
+                       -c ../tl10b_combined_wce.bw \
+                       -o \`basename {} .bw\`_501bp_linear_enrichment.bw \
+                       -w 501 -l linear \
+                       ::: ../tl10b_h3k*.bw 
+```
+
+## MEME suite installation
+
+```{bash meme_install}
+cd /data/download
+wget 'http://meme-suite.org/meme-software/4.10.2/meme_4.10.2.tar.gz'
+mkdir /data/temp
+cd /data/temp
+tar xf ../download/meme*
+cd meme_4.10.2
+./configure --prefix=/data/software/meme --enable-build-libxml2 --enable-build-libxslt
+make -j 8
+make install
+```
+
+## FIMO motif scanning
+
+```{bash fimo}
+mkdir /data/fimo
+cd /data/fimo
+```
+
+Export JASPAR and FlyFactorSurvey motifs from Bioconductor's `MotifDb` package:
+
+```{r export_motifs}
+library(MotifDb)
+dmel <- query(MotifDb, "Dmelanogaster")
+keep <- c(grep("JASPAR", names(dmel)), 
+          grep("FlyFactor", names(dmel)))
+export(dmel[keep], "motifs.meme", format="MEME")
+```
+
+Download Drosophila HOT regions from modENCODE:
+
+```{r modencode_hot_regions}
+library(rtracklayer)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+hot.gff <- import("http://www.modencode.org/publications/files/fly/DataS8.gff", asRangedData=FALSE)
+seqlevels(hot.gff) <- paste0("chr", seqlevels(hot.gff))
+hot.seq <- getSeq(Dmelanogaster, hot.gff)
+names(hot.seq) <- paste0("hotregion_", 1:length(hot.seq))
+writeXStringSet(hot.seq, file="hot_regions.fasta")
+```
+
+Build a FIMO background file from the HOT regions and run FIMO on the exported motifs:
+
+```{bash run_fimo}
+cat hot_regions.fasta | /data/software/meme/bin/fasta-get-markov > dm3_background.markov
+
+mkdir /data/fimo/genome
+cd /data/fimo/genome
+tar xf /data/chipseq/genome/chromFa.tar.gz
+rm *U*.fa
+rm *M*.fa
+rm *H*.fa
+cd ..
+
+parallel -uj 6 /data/software/meme/bin/fimo --bgfile dm3_background.markov --text motifs.meme {} \| gzip \> \`basename {.}\`_fimo.txt.gz ::: genome/*.fa
+mkdir granges
+```
+
+Convert FIMO output to per-motif `GRanges`:
+
+```{r convert_fimo_output}
+library(GenomicRanges)
+library(rtracklayer)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+library(magrittr)
+
+files <- list.files("fimo_output", "chr.*txt\\.gz", full.names=TRUE)
+
+read_fimo_output <- function(filename) {
+  message("Reading: ", filename)
+  fimo.df <- read.delim(filename, header=TRUE, stringsAsFactors=FALSE)
+  fimo.gr <- with(fimo.df, GRanges(ranges=IRanges(start=start, end=stop), 
+                                   strand=strand,
+                                   seqnames=sequence.name,
+                                   motif=gsub("Dmelanogaster-", "", X.pattern.name),
+                                   score=score))
+  fimo.gr
+}
+
+fimo.list <- mclapply(files, read_fimo_output, mc.cores=6, mc.preschedule=FALSE)
+
+message("Combining...")
+fimo.gr <- do.call(c, fimo.list)
+rm(fimo.list)
+invisible(gc())
+
+seqlengths(fimo.gr) <- seqlengths(Dmelanogaster)[seqlevels(fimo.gr)]
+fimo.gr <- trim(fimo.gr)
+
+message("Ordering...")
+fimo.gr <- fimo.gr[order(fimo.gr)]
+
+message("Saving GRanges...")
+
+nothing <- unique(fimo.gr$motif) %>%
+        mclapply(function(motif_name) {
+                motif.gr <- fimo.gr[fimo.gr$motif == motif_name]
+                message(motif_name, " with ", prettyNum(length(motif.gr), big.mark=","), " matches")
+                saveRDS(motif.gr, file=paste0("granges/", motif_name, ".granges.rds"))
+        }, mc.cores=6, mc.preschedule=FALSE)           
+```
+
+## Generation of PhastCon track
+
+PhastCon data files were downloaded from UCSC:
+
+```{bash download_phastcon, eval=FALSE}
+mkdir /data/phastcon
+cd /data/phastcon
+wget -r -nd -np -P . -A '*.pp.gz' 'ftp://hgdownload.cse.ucsc.edu/goldenPath/dm3/phastCons15way'
+```
+
+Downloaded files were combined into a single BigWig in R:
+
+```{r build_phastcon_bigwig, eval=FALSE}
+library(rtracklayer)
+library(parallel)
+library(magrittr)
+
+files <- list.files(".", "pp.gz")
+
+files <- files[-grep("H|U|M", files)]
+
+phastcon.gr <- files %>%
+               mclapply(import, format="wig", mc.cores=4, mc.preschedule=FALSE) %>%
+               do.call(c, .)
+
+message("Building coverage...")
+phastcon.cov <- coverage(phastcon.gr, weight="score")
+
+message("Saving BigWig...")
+export(phastcon.cov, "phastcon_15way.bw")
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+
+<title></title>
+
+<script src="html_include/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="html_include/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="html_include/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="html_include/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="html_include/bootstrap-3.3.5/shim/respond.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<link rel="stylesheet"
+      href="html_include/highlight/default.css"
+      type="text/css" />
+<script src="html_include/highlight/highlight.js"></script>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+<link rel="stylesheet" href="html_include/custom.css" type="text/css" />
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script src="html_include/navigation-1.1/tabsets.js"></script>
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+
+
+<div class="fluid-row" id="header">
+
+
+
+
+</div>
+
+<div id="TOC">
+<ul>
+<li><a href="#figure-1b-transcription-factor-boxplots">Figure 1B: Transcription factor boxplots</a><ul>
+<li><a href="#closed-regions">Closed regions</a></li>
+<li><a href="#enrichments-figure">Enrichments figure</a><ul>
+<li><a href="#statistics">Statistics</a></li>
+</ul></li>
+<li><a href="#fold-change-figure">Fold change figure</a><ul>
+<li><a href="#statistics-1">Statistics</a></li>
+</ul></li>
+<li><a href="#session-information">Session information</a></li>
+</ul></li>
+</ul>
+</div>
+
+<div id="figure-1b-transcription-factor-boxplots" class="section level1">
+<h1>Figure 1B: Transcription factor boxplots</h1>
+<p><strong>Project:</strong> Repressed Enhancers</p>
+<p><strong>Author:</strong> <a href="mailto:jjj@stowers.org">Jeff Johnston</a></p>
+<p><strong>Generated:</strong> Sun Aug 14 2016, 09:17 PM</p>
+<div id="closed-regions" class="section level2">
+<h2>Closed regions</h2>
+<p>Closed regions are putative enhancer regions active in the late (14-16h AEL) embryo but not active in the early embryo (2-4h AEL). These are defined by the following criteria:</p>
+<ul>
+<li>Defined as open by DHS only in Stage 14 but no previous stages</li>
+<li>More than 1,000 bp from an annotated TSS</li>
+<li>Enriched in H3K27Ac in 14-16h (using modENCODE’s list of enriched regions)</li>
+<li>At least 200 bp in width</li>
+</ul>
+<table style="width:68%;">
+<caption>Median enrichment values</caption>
+<colgroup>
+<col width="12%" />
+<col width="12%" />
+<col width="16%" />
+<col width="26%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">tissue</th>
+<th align="center">factor</th>
+<th align="center">replicate</th>
+<th align="center">median_enrichment</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">mad</td>
+<td align="center">1</td>
+<td align="center">3.038479</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">mad</td>
+<td align="center">2</td>
+<td align="center">5.177029</td>
+</tr>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">zen</td>
+<td align="center">1</td>
+<td align="center">9.342235</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">zen</td>
+<td align="center">2</td>
+<td align="center">7.635403</td>
+</tr>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">zld</td>
+<td align="center">1</td>
+<td align="center">5.955312</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">zld</td>
+<td align="center">2</td>
+<td align="center">13.786509</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">dl</td>
+<td align="center">1</td>
+<td align="center">5.401049</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">dl</td>
+<td align="center">2</td>
+<td align="center">1.716881</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">twi</td>
+<td align="center">1</td>
+<td align="center">38.093264</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">twi</td>
+<td align="center">2</td>
+<td align="center">10.393152</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">zld</td>
+<td align="center">1</td>
+<td align="center">12.369055</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">zld</td>
+<td align="center">2</td>
+<td align="center">29.327038</td>
+</tr>
+</tbody>
+</table>
+<table style="width:75%;">
+<caption>Replicate selection</caption>
+<colgroup>
+<col width="12%" />
+<col width="12%" />
+<col width="34%" />
+<col width="15%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">tissue</th>
+<th align="center">factor</th>
+<th align="center">best_median_enrichment</th>
+<th align="center">replicate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">mad</td>
+<td align="center">5.177029</td>
+<td align="center">2</td>
+</tr>
+<tr class="even">
+<td align="center">de</td>
+<td align="center">zen</td>
+<td align="center">9.342235</td>
+<td align="center">1</td>
+</tr>
+<tr class="odd">
+<td align="center">de</td>
+<td align="center">zld</td>
+<td align="center">13.786509</td>
+<td align="center">2</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">dl</td>
+<td align="center">5.401049</td>
+<td align="center">1</td>
+</tr>
+<tr class="odd">
+<td align="center">m</td>
+<td align="center">twi</td>
+<td align="center">38.093264</td>
+<td align="center">1</td>
+</tr>
+<tr class="even">
+<td align="center">m</td>
+<td align="center">zld</td>
+<td align="center">29.327038</td>
+<td align="center">2</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="enrichments-figure" class="section level2">
+<h2>Enrichments figure</h2>
+<p><img src="figure_1b_transcription_factor_boxplots/display_plot-1.png" width="864" /></p>
+<div id="statistics" class="section level3">
+<h3>Statistics</h3>
+<table>
+<colgroup>
+<col width="10%" />
+<col width="27%" />
+<col width="27%" />
+<col width="10%" />
+<col width="13%" />
+<col width="9%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">factor</th>
+<th align="center">active_vs_repressed_pvalue</th>
+<th align="center">repressed_vs_closed_pvalue</th>
+<th align="center">active_n</th>
+<th align="center">repressed_n</th>
+<th align="center">closed_n</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">dl</td>
+<td align="center">2.880601e-05</td>
+<td align="center">8.909524e-09</td>
+<td align="center">37</td>
+<td align="center">22</td>
+<td align="center">100</td>
+</tr>
+<tr class="even">
+<td align="center">twi</td>
+<td align="center">4.477966e-10</td>
+<td align="center">4.881017e-12</td>
+<td align="center">37</td>
+<td align="center">22</td>
+<td align="center">100</td>
+</tr>
+<tr class="odd">
+<td align="center">zld_m</td>
+<td align="center">4.226042e-01</td>
+<td align="center">2.837505e-13</td>
+<td align="center">37</td>
+<td align="center">22</td>
+<td align="center">100</td>
+</tr>
+<tr class="even">
+<td align="center">mad</td>
+<td align="center">9.748400e-09</td>
+<td align="center">1.203969e-11</td>
+<td align="center">22</td>
+<td align="center">37</td>
+<td align="center">100</td>
+</tr>
+<tr class="odd">
+<td align="center">zen</td>
+<td align="center">2.415323e-09</td>
+<td align="center">6.802985e-15</td>
+<td align="center">22</td>
+<td align="center">37</td>
+<td align="center">100</td>
+</tr>
+<tr class="even">
+<td align="center">zld_de</td>
+<td align="center">7.193996e-04</td>
+<td align="center">1.557375e-15</td>
+<td align="center">22</td>
+<td align="center">37</td>
+<td align="center">100</td>
+</tr>
+<tr class="odd">
+<td align="center">zld (both)</td>
+<td align="center">1.648338e-04</td>
+<td align="center">1.775730e-27</td>
+<td align="center">59</td>
+<td align="center">59</td>
+<td align="center">200</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="fold-change-figure" class="section level2">
+<h2>Fold change figure</h2>
+<p><img src="figure_1b_transcription_factor_boxplots/zelda_fold_change_plot-1.png" width="288" /></p>
+<div id="statistics-1" class="section level3">
+<h3>Statistics</h3>
+<table style="width:46%;">
+<caption>Zelda fold change between meso and DE</caption>
+<colgroup>
+<col width="23%" />
+<col width="5%" />
+<col width="16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="center">Test</th>
+<th align="center">n</th>
+<th align="center">pvalue</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="center">Wilcox two-sided</td>
+<td align="center">59</td>
+<td align="center">7.406498e-06</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="session-information" class="section level2">
+<h2>Session information</h2>
+<p>For reproducibility, this analysis was performed with the following R/Bioconductor session:</p>
+<pre><code>R version 3.3.1 (2016-06-21)
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+Running under: OS X 10.12 (Sierra)
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+ [1] stats4    parallel  grid      stats     graphics  grDevices utils    
+ [8] datasets  methods   base     
+
+other attached packages:
+ [1] readr_1.0.0          rtracklayer_1.32.2   GenomicRanges_1.24.2
+ [4] GenomeInfoDb_1.8.3   IRanges_2.6.1        S4Vectors_0.10.2    
+ [7] BiocGenerics_0.18.0  digest_0.6.10        yaml_2.1.13         
+[10] pander_0.6.0         magrittr_1.5         dplyr_0.5.0         
+[13] ggplot2_2.1.0        setwidth_1.0-4      
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_0.12.6                RStudioConsoleRender_0.1.0
+ [3] formatR_1.4                plyr_1.8.4                
+ [5] XVector_0.12.1             bitops_1.0-6              
+ [7] tools_3.3.1                zlibbioc_1.18.0           
+ [9] evaluate_0.9               tibble_1.1                
+[11] gtable_0.2.0               DBI_0.5                   
+[13] rstudioapi_0.6             stringr_1.0.0             
+[15] knitr_1.14                 Biostrings_2.40.2         
+[17] Biobase_2.32.0             R6_2.1.2                  
+[19] BiocParallel_1.6.5         XML_3.98-1.4              
+[21] rmarkdown_1.0.9001         GenomicAlignments_1.8.4   
+[23] Rsamtools_1.24.0           scales_0.4.0              
+[25] htmltools_0.3.5            SummarizedExperiment_1.2.3
+[27] assertthat_0.1             colorspace_1.2-6          
+[29] labeling_0.3               stringi_1.1.1             
+[31] lazyeval_0.2.0             RCurl_1.95-4.8            
+[33] munsell_0.4.3             </code></pre>
+</div>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+$(document).ready(function () {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

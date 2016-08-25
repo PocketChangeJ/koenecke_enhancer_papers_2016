@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+
+<title></title>
+
+<script src="html_include/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="html_include/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="html_include/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="html_include/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="html_include/bootstrap-3.3.5/shim/respond.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<link rel="stylesheet"
+      href="html_include/highlight/default.css"
+      type="text/css" />
+<script src="html_include/highlight/highlight.js"></script>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+<link rel="stylesheet" href="html_include/custom.css" type="text/css" />
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script src="html_include/navigation-1.1/tabsets.js"></script>
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+
+
+<div class="fluid-row" id="header">
+
+
+
+
+</div>
+
+<div id="TOC">
+<ul>
+<li><a href="#known-enhancer-example-figures">Known enhancer example figures</a><ul>
+<li><a href="#session-information">Session information</a></li>
+</ul></li>
+</ul>
+</div>
+
+<div id="known-enhancer-example-figures" class="section level1">
+<h1>Known enhancer example figures</h1>
+<p><strong>Project:</strong> Repressed Enhancers</p>
+<p><strong>Author:</strong> <a href="mailto:jjj@stowers.org">Jeff Johnston</a></p>
+<p><strong>Generated:</strong> Mon Aug 15 2016, 01:02 PM</p>
+<div id="session-information" class="section level2">
+<h2>Session information</h2>
+<p>For reproducibility, this analysis was performed with the following R/Bioconductor session:</p>
+<pre><code>R version 3.3.1 (2016-06-21)
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+Running under: OS X 10.11.6 (El Capitan)
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+ [1] grid      stats4    parallel  stats     graphics  grDevices utils    
+ [8] datasets  methods   base     
+
+other attached packages:
+ [1] Gviz_1.16.4                              
+ [2] digest_0.6.10                            
+ [3] yaml_2.1.13                              
+ [4] pander_0.6.0                             
+ [5] readr_1.0.0                              
+ [6] dplyr_0.5.0                              
+ [7] magrittr_1.5                             
+ [8] BSgenome.Dmelanogaster.UCSC.dm3_1.4.0    
+ [9] BSgenome_1.40.1                          
+[10] rtracklayer_1.32.2                       
+[11] Biostrings_2.40.2                        
+[12] XVector_0.12.1                           
+[13] TxDb.Dmelanogaster.UCSC.dm3.ensGene_3.2.2
+[14] GenomicFeatures_1.24.5                   
+[15] AnnotationDbi_1.34.4                     
+[16] Biobase_2.32.0                           
+[17] GenomicRanges_1.24.2                     
+[18] GenomeInfoDb_1.8.3                       
+[19] IRanges_2.6.1                            
+[20] S4Vectors_0.10.2                         
+[21] BiocGenerics_0.18.0                      
+[22] setwidth_1.0-4                           
+
+loaded via a namespace (and not attached):
+ [1] httr_1.2.1                    AnnotationHub_2.4.2          
+ [3] splines_3.3.1                 Formula_1.2-1                
+ [5] shiny_0.13.2                  assertthat_0.1               
+ [7] interactiveDisplayBase_1.10.3 latticeExtra_0.6-28          
+ [9] Rsamtools_1.24.0              RSQLite_1.0.0                
+[11] lattice_0.20-33               biovizBase_1.20.0            
+[13] chron_2.3-47                  RColorBrewer_1.1-2           
+[15] colorspace_1.2-6              htmltools_0.3.5              
+[17] httpuv_1.3.3                  Matrix_1.2-6                 
+[19] plyr_1.8.4                    XML_3.98-1.4                 
+[21] biomaRt_2.28.0                zlibbioc_1.18.0              
+[23] xtable_1.8-2                  scales_0.4.0                 
+[25] BiocParallel_1.6.5            tibble_1.1                   
+[27] ggplot2_2.1.0                 SummarizedExperiment_1.2.3   
+[29] lazyeval_0.2.0                nnet_7.3-12                  
+[31] survival_2.39-5               mime_0.5                     
+[33] evaluate_0.9                  foreign_0.8-66               
+[35] BiocInstaller_1.22.3          tools_3.3.1                  
+[37] data.table_1.9.6              formatR_1.4                  
+[39] matrixStats_0.50.2            stringr_1.0.0                
+[41] munsell_0.4.3                 cluster_2.0.4                
+[43] ensembldb_1.4.7               RStudioConsoleRender_0.1.0   
+[45] RCurl_1.95-4.8                dichromat_2.0-0              
+[47] rstudioapi_0.6                VariantAnnotation_1.18.6     
+[49] bitops_1.0-6                  rmarkdown_1.0.9001           
+[51] gtable_0.2.0                  DBI_0.4-1                    
+[53] R6_2.1.2                      GenomicAlignments_1.8.4      
+[55] gridExtra_2.2.1               knitr_1.13                   
+[57] Hmisc_3.17-4                  stringi_1.1.1                
+[59] Rcpp_0.12.6                   rpart_4.1-10                 
+[61] acepack_1.3-3.3              </code></pre>
+</div>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+$(document).ready(function () {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

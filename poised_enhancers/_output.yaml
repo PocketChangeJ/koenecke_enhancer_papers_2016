@@ -1,0 +1,7 @@
+html_document:
+  self_contained: true
+  lib_dir: html_include
+  toc: true
+  theme: default
+  highlight: pygments
+  mathjax: default

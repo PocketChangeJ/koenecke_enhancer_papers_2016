@@ -1,0 +1,111 @@
+``` {r setup, echo=FALSE, message=FALSE, include=FALSE, error=FALSE}
+library(ggplot2)
+
+# Output folder for this document
+options(knitr.figure_dir = "calculate_histone_normalization_factors")
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/enhancers.r")
+source("shared_code/import.r")
+source("shared_code/samples.r")
+```
+
+# Calculate histone normalization factors
+
+``` {r header_child, child="child_docs/header_child.Rmd"}
+```
+
+## Overview
+
+``` {r load_data}
+enrichments.df <- readRDS("calculate_enrichments_at_known_enhancers/enrichments.df.rds")
+```
+
+``` {r calculate_normalization_factors}
+
+factors <- c("h3k27ac", "h3k27me3", "h3k4me1")
+replicates.df <- data_frame(factor = factors,
+                            peak_type = c("broad", "broad", "narrow"),
+                            replicate.m  = factors %>% lapply(function(f) { enrichment_values("m",  f, "best", enrichments.df)$replicate[1] }) %>% unlist,
+                            replicate.de = factors %>% lapply(function(f) { enrichment_values("de", f, "best", enrichments.df)$replicate[1] }) %>% unlist)
+
+replicates.df %>% pander
+
+load_tissue_peaks <- function(i, replicates.df) {
+  rep.m  <- replicates.df$replicate.m[i]
+  rep.de <- replicates.df$replicate.de[i]
+  f      <- replicates.df$factor[i]
+  peak_type <- replicates.df$peak_type[i]
+  
+  peaks <- list(m  = data_path(paste0("macs/tl10b_", f, "_", rep.m,  "_peaks.", peak_type, "Peak")),
+                de = data_path(paste0("macs/gd7_",   f, "_", rep.de, "_peaks.", peak_type, "Peak")))
+  lapply(peaks, import.macs_peak)
+}
+
+combine_tissue_peaks <- function(peaks.list) {
+  peaks.gr <- do.call(GenomicRanges::intersect, unname(peaks.list))
+  peaks.gr <- resize(peaks.gr, width=1001, fix="center")
+  peaks.gr[1:pmin(length(peaks.gr), 5000)]
+}
+
+calculate_tissue_enrichments <- function(i, replicates.df, peaks.list) {
+  rep.m  <- replicates.df$replicate.m[i]
+  rep.de <- replicates.df$replicate.de[i]
+  f      <- replicates.df$factor[i]
+
+  peaks.gr <- peaks.list[[f]]
+
+  meso_sample <- subset(samples.df, factor == f & tissue == "m" & replicate == rep.m)$sample
+  de_sample   <- subset(samples.df, factor == f & tissue == "de" & replicate == rep.de)$sample
+  
+  ip.m  <- sample_bigwig(meso_sample, bigwig="ip")
+  ip.de <- sample_bigwig(de_sample, bigwig="ip")
+  
+  wce.m  <- sample_bigwig(meso_sample, bigwig="wce")
+  wce.de <- sample_bigwig(de_sample, bigwig="wce")
+
+  peaks.gr$enrichment.m  <- (regionSums(peaks.gr, ip.m)  / total_signal(ip.m))  / (regionSums(peaks.gr, wce.m)  / total_signal(wce.m))
+  peaks.gr$enrichment.de <- (regionSums(peaks.gr, ip.de) / total_signal(ip.de)) / (regionSums(peaks.gr, wce.de) / total_signal(wce.de))
+  peaks.gr$fold_change <- with(mcols(peaks.gr), enrichment.m / enrichment.de)
+  peaks.gr
+}
+
+peaks.list <- 1:nrow(replicates.df) %>%
+              lapply(load_tissue_peaks, replicates.df) %>%
+              lapply(combine_tissue_peaks)
+
+names(peaks.list) <- replicates.df$factor
+
+peaks.list <- 1:nrow(replicates.df) %>%
+              checked_mclapply(calculate_tissue_enrichments, replicates.df, peaks.list, mc.cores=3)
+names(peaks.list) <- replicates.df$factor
+
+```
+
+``` {r plot_fold_changes}
+
+fc.df <- names(peaks.list) %>%
+         lapply(function(n) {
+           df <- as.data.frame(mcols(peaks.list[[n]]))
+           df$factor <- n
+           df
+         }) %>%
+         bind_rows
+
+medians.df <- fc.df %>%
+              group_by(factor) %>%
+              summarize(median_log2_fold_change = median(log2(fold_change)))
+
+medians.df %>% pander("Median log2 fold changes")
+
+saveRDS(medians.df, file=figure_path("medians.df.rds"))
+
+g <- ggplot(fc.df, aes(x=factor, y=log2(fold_change))) +
+     geom_boxplot() +
+     theme_bw()
+g
+```
+
+``` {r session_info_child, child="child_docs/session_info_child.Rmd"}
+```
