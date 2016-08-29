@@ -26,10 +26,15 @@ enhancers.df <- readRDS("figure_3d_zelda_and_polycomb/enhancers_with_pre.df.rds"
 enrichments.df <- readRDS("calculate_enrichments_at_known_enhancers/enrichments.df.rds")
 dhs.df <- readRDS("figure_4b_dhs_time_course/dhs_known.rds")
 rnaseq.df <- rnaseq_results() 
+rnaseq.df$diff_exp_status <- "Not differential"
+rnaseq.df$diff_exp_status[rnaseq.df$significant & rnaseq.df$direction == "up"] <- "Higher in Toll10b"
+rnaseq.df$diff_exp_status[rnaseq.df$significant & rnaseq.df$direction == "down"] <- "Higher in gd7"
 
 genes <- subset(enhancers.df, gene_name != "Unknown")$gene_name %>% unique
-rnaseq.df <- subset(rnaseq.df, fb_symbol %in% genes)[, c("fb_symbol", "RPKM_1", "RPKM_2")]
-names(rnaseq.df) <- c("gene_name", "FPKM.de", "FPKM.m")
+rnaseq.df %<>% filter(fb_symbol %in% genes) %>%
+               select(fb_symbol, RPKM_1, RPKM_2, diff_exp_status)
+
+names(rnaseq.df) <- c("gene_name", "FPKM.de", "FPKM.m", "DifferentialExpression")
 rnaseq.df[, 2:3] %<>% as.matrix %>% round(2)
 
 ```
@@ -38,6 +43,7 @@ rnaseq.df[, 2:3] %<>% as.matrix %>% round(2)
 
   - Enhancer details
   - Target gene expression in each tissue
+  - Differential expression status of target gene
   - Tx factor enrichments
   - Histone enrichments
   - K27me3 low/high
@@ -128,7 +134,7 @@ cols <- c("enhancer_name", "target_gene_name", "enhancer_type", "classification"
           "H3K27ac_gd7_enrichment", "H3K27ac_Toll10b_enrichment", "H3K27me3_gd7_enrichment",
           "H3K27me3_Toll10b_enrichment", "H3K4me1_gd7_enrichment", "H3K4me1_Toll10b_enrichment",
           "dl_Toll10b_enrichment", "mad_gd7_enrichment", "twi_Toll10b_enrichment",
-          "zen_gd7_enrichment", "FPKM_gd7", "FPKM_Toll10b", 
+          "zen_gd7_enrichment", "FPKM_gd7", "FPKM_Toll10b", "DifferentialExpression", 
           "H3K27me3_classification", "PRE_distance", "PRE_peak_name", 
           "DHS_score_stage_5", "DHS_score_stage_9", "DHS_score_stage_10",
           "DHS_score_stage_11", "DHS_score_stage_14")

@@ -1,60 +1,60 @@
-enhancer_name	target_gene_name	enhancer_type	classification	chr	start	end	reference	H3K27ac_gd7_enrichment	H3K27ac_Toll10b_enrichment	H3K27me3_gd7_enrichment	H3K27me3_Toll10b_enrichment	H3K4me1_gd7_enrichment	H3K4me1_Toll10b_enrichment	dl_Toll10b_enrichment	mad_gd7_enrichment	twi_Toll10b_enrichment	zen_gd7_enrichment	FPKM_gd7	FPKM_Toll10b	H3K27me3_classification	PRE_distance	PRE_peak_name	DHS_score_stage_5	DHS_score_stage_9	DHS_score_stage_10	DHS_score_stage_11	DHS_score_stage_14
-Ady43A_Markstein	Ady43A	mesoderm	TSS	chr2R	3133869	3134085	Markstein et al. (2004)	0.8	1.96	0.51	0.43	1.27	0.74	2.86	1.3	1.69	0.6	0.69	1.72	Low	171851	PRE_peak_96	0.21	0.12	0.08	0.24	0.53
-Ance_Rusch	Ance	dorsal ectoderm	TSS	chr2L	13904733	13905265	Rusch and Levine (1997)	12.24	10.9	0.43	0.18	3.93	2.62	2.52	10.6	12.35	21.57	93.94	36.15	Low	505032	PRE_peak_62	1.26	1.49	1.83	1.03	0.44
-apt_Ozdemir	apt	mesoderm	Intragenic	chr2R	19460067	19462066	Ozdemir et al. (2011)	0.85	2.24	0.77	1.37	2.1	1.74	2.2	5.45	33.15	4.92	69.54	64.09	Low	46786	PRE_peak_170	2.53	2.7	2.17	1.23	0.69
-Asph_Ozdemir	Asph	mesoderm	TSS	chr2R	11997142	11999642	Ozdemir et al. (2011)	3.38	14.25	0.29	0.19	3.02	3.8	9.18	5.45	45.76	8.72	11.87	146.94	Low	274375	PRE_peak_147	1.21	1.24	1.25	0.72	0.43
-BobA_Ozdemir	Unknown	mesoderm	Intergenic	chr3L	14945343	14947303	Ozdemir et al. (2011)	2.7	4.76	0.84	1.06	1.91	1.73	5.94	2.67	41.31	2.25			Low	89695	PRE_peak_246	1.02	1.53	1.1	0.37	0.32
-C15_650_Lin	C15	dorsal ectoderm	Intragenic	chr3R	17331786	17332437	Lin et al. (2006)	1.37	0.5	2.46	9.45	2.01	1.08	1.22	14.7	0.86	23.39	11.59	0	Low	6109	PRE_peak_418	1.36	1.35	1.36	0.65	0.3
-cact_Sandmann	cact	mesoderm	Intragenic	chr2L	16319411	16320423	Sandmann et al. (2007)	1.12	8.78	0.26	0.18	1.8	3.76	11.28	1.2	55.98	0.76	285.36	573.88	Low	102147	PRE_peak_68	0.78	0.95	0.48	0.3	0.31
-CG4221_Sandmann	CG4221	mesoderm	TSS	chr3R	11746513	11748343	Sandmann et al. (2007)	4.13	13.36	0.58	0.35	2.63	4.67	3.58	7.72	65.48	16.09	5.67	47.52	Low	66576	PRE_peak_348	2.06	1.91	2.03	1.24	0.63
-CG8788_Sandmann	CG8788	mesoderm	TSS	chr2R	5025946	5026574	Sandmann et al. (2007)	4.04	7.97	0.22	0.12	2.8	2.19	3.78	4.67	55.5	4.14	87.13	86.25	Low	803815	PRE_peak_103	2.68	3.24	2.44	1.96	0.78
-Cnx99A_Ozdemir	Unknown	mesoderm	Intergenic	chr3R	25134141	25135377	Ozdemir et al. (2011)	1.54	6.98	1.11	0.89	2.22	1.64	8.43	2.75	89.67	1.5			Low	246373	PRE_peak_442	1.16	1.35	0.68	0.93	0.43
-Cyp310a1_Ozdemir	Cyp310a1	mesoderm	TSS	chr2L	18652293	18653292	Ozdemir et al. (2011)	0.73	15.47	0.87	0.43	1.16	4.31	14.96	1.68	107.03	1.49	0.55	258.2	Low	53765	PRE_peak_75	1.57	1.11	0.55	0.38	0.37
-dpp_Huang	dpp	dorsal ectoderm	Intragenic	chr2L	2455866	2457725	Huang et al. (1993)	5.25	2.31	2.91	7.33	3.58	2.33	23.31	24.47	12.37	41.46	18.74	3.01	Low	714	PRE_peak_24	2.5	1.4	0.75	0.29	0.4
-Dscam_Ozdemir	Unknown	mesoderm	TSS	chr2R	3268100	3268475	Ozdemir et al. (2011)	4	2.99	0.61	1.33	2.69	2.49	22.16	5.54	127.93	5.61			Low	37461	PRE_peak_96	4.02	3.68	2.51	1.49	0.81
-Dtg_Hodar	Dtg	dorsal ectoderm	TSS	chr3R	8473379	8473902	Hodar et al. (2014)	3.4	4.74	0.52	0.93	2.65	3.28	4.51	4.89	16.65	6.5	246.6	115.37	Low	366417	PRE_peak_338	2.86	2.99	2.74	3.24	1.64
-emc_Ozdemir	Unknown	mesoderm	TSS	chr3L	742059	743659	Ozdemir et al. (2011)	4.81	9.52	0.57	1.44	1.69	1.63	15.16	1.02	76.35	3.75			Low	25777	PRE_peak_185	0.9	1.04	0.67	0.66	0.44
-htl_Stathopoulos	htl	mesoderm	TSS	chr3R	13875600	13876391	Stathopoulos et al. (2004)	1.52	7.13	1.77	0.79	1.32	2.3	4.12	2.18	45.59	1.97	0.8	79.72	Low	12581	PRE_peak_405	1.73	1.86	1.37	1.19	0.59
-Ilp4_Stathopoulos	Ilp4	mesoderm	TSS	chr3L	9797449	9797743	Stathopoulos et al. (2002)	1.65	8.12	0.87	0.45	1.71	2.21	7.93	3.41	16.54	8.81	26.62	1968.19	Low	421360	PRE_peak_211	0.8	0.42	0.53	0.27	0.29
-Mdr49_Zeitlinger	Mdr49	mesoderm	TSS	chr2R	8833934	8834294	Zeitlinger et al. (2007)	1.39	5.39	1.8	2.76	2.06	3.83	5.33	3.87	12.28	3.83	2.88	222.56	Low	9049	PRE_peak_119	1.89	2.21	1.53	1.22	0.36
-Mef2_Nguyen	Mef2	mesoderm	Intragenic	chr2R	5819214	5819493	Nguyen and Xu (1998)	0.49	5.83	1.09	0.78	0.7	2.03	6.52	0.3	74.77	0.76	7.36	52.38	Low	10896	PRE_peak_103	1.39	2.27	1.84	1.66	0.33
-Mef2_Ozdemir	Mef2	mesoderm	TSS	chr2R	5847634	5848273	Ozdemir et al. (2011)	7.71	18.38	0.36	0.2	2.39	2.13	8.03	3.78	100.12	3.69	7.36	52.38	Low	16682	PRE_peak_104	2.32	2.52	1.64	1.09	0.59
-mir-1_Biemar	mir-1	mesoderm	Intragenic	chr2L	20480577	20481741	Biemar et al. (2006)	0.68	3.8	0.9	0.39	0.63	1.62	5.44	0.57	84.81	3.51			Low	288623	PRE_peak_81	0.76	1.5	1.04	0.46	0.39
-mir-1_Zeitlinger	mir-1	mesoderm	Intragenic	chr2L	20475806	20477901	Zeitlinger et al. (2007)	0.42	5.49	0.83	0.43	0.66	1.91	6.9	0.82	54.85	1.43			Low	292463	PRE_peak_81	0.33	0.67	0.72	1.01	0.6
-Ocho_Ozdemir	Unknown	mesoderm	TSS	chr3L	14968341	14970091	Ozdemir et al. (2011)	4.03	14.37	0.8	1.28	2.9	9.52	21.82	4.9	105.17	4.41			Low	66907	PRE_peak_246	1.54	2.2	1.7	1.48	0.41
-Phm_Markstein	Phm	mesoderm	TSS	chr2R	19875348	19875790	Markstein et al. (2004)	2.27	11.65	0.46	0.23	1.54	2.07	28.04	2.34	60.55	1.87	11.54	19.67	Low	340537	PRE_peak_172	1.82	1.62	0.64	0.9	0.48
-pnr_Zeitlinger	pnr	dorsal ectoderm	Intragenic	chr3R	11854234	11854784	Zeitlinger et al. (2007)	2.59	0.48	3.18	8.33	2.32	1.36	1.66	25.19	6.88	44.58	36.99	0.57	Low	2209	PRE_peak_350	2.35	1.91	0.58	0.28	0.38
-pnt_Ozdemir	Unknown	mesoderm	Intragenic	chr3R	19169181	19170380	Ozdemir et al. (2011)	1.21	3.2	1.97	1.16	2.36	2.92	5.4	5.18	54.93	6.21			Low	47694	PRE_peak_432	2.29	2.83	2.27	1.98	0.32
-sna_Ip	sna	mesoderm	TSS	chr2L	15478144	15481082	Ip et al. (1992b)	0.64	5.89	7.4	3.08	1.99	2.32	45.96	5.58	58.18	19.15	2.08	753.54	Low	144080	PRE_peak_67	1.24	1.18	0.99	1.07	0.46
-sna-S_Perry	sna	mesoderm	TSS	chr2L	15485484	15486749	Perry et al. (2010)	0.55	4.78	5.31	3.65	1.76	2.22	36.1	4.36	148.21	11.34	2.08	753.54	Low	151420	PRE_peak_67	1.7	1.01	0.62	0.36	0.3
-stumps_Sandmann	stumps	mesoderm	TSS	chr3R	10414437	10416493	Sandmann et al. (2007)	0.63	7.09	1.39	1.82	1.19	2.48	8.66	1.54	66.67	1.59	0.29	154.76	Low	686704	PRE_peak_347	0.64	1.32	0.9	0.91	0.4
-T48_Sandmann	T48	mesoderm	TSS	chr3R	22707641	22709469	Sandmann et al. (2007)	1.49	5.11	0.43	0.73	1.76	3	3.03	3.15	40.8	5	3.26	17.14	Low	194	PRE_peak_436	0.7	0.7	0.77	0.56	0.37
-tin_Yin	tin	mesoderm	Intragenic	chr3R	17205819	17205999	Yin et al. (1997)	0.35	4.72	13.53	11.18	1.42	2.71	6.17	1.32	43.37	2.21	0.17	100.83	Low	980	PRE_peak_411	1.92	2.41	1.95	0.65	0.44
-tld_Kirov	tld	dorsal ectoderm	TSS	chr3R	20574728	20575524	Kirov et al. (1994)	1.51	0.8	0.54	1.13	2.59	2.05	6.19	7.42	11.08	32.39	52.75	2.44	Low	330687	PRE_peak_433	3.04	2.97	1.95	2.1	0.35
-trbl_Sandmann	trbl	mesoderm	TSS	chr3L	20394270	20396658	Sandmann et al. (2007)	12.2	13.07	0.23	0.12	3.92	3.02	8.37	8.38	49.84	19.46	67.23	207.57	Low	216832	PRE_peak_254	2.86	2.69	2.47	1.73	0.68
-tup_Zeitlinger	tup	dorsal ectoderm	Intragenic	chr2L	18875141	18875548	Zeitlinger et al. (2007)	2.77	1.03	1.43	8.39	5.05	1.47	2.5	32.91	20.08	38.39	35.8	1.14	Low	5564	PRE_peak_79	1.9	1.75	1.51	0.84	0.35
-twi_Jiang	twi	mesoderm	TSS	chr2R	18932429	18933663	Jiang et al. (1991)	1.24	12.53	8.59	5.57	3.1	3.39	12.35	5.28	21.54	5.52	0.19	708.85	Low	0	PRE_peak_168	0.84	0.59	0.57	0.35	0.29
-twi_Ozdemir	twi	mesoderm	Intergenic	chr2R	18936997	18938126	Ozdemir et al. (2011)	0.56	9.26	10.45	4.85	1.48	2.41	9.56	4.26	66.31	9.34	0.19	708.85	Low	0	PRE_peak_169	1.73	1.91	1.31	1.1	0.33
-VT0984_Kvon	erm	dorsal ectoderm	Intragenic	chr2L	1958014	1960258	Kvon et al. (2012)	0.68	0.4	11.86	15.32	1.28	0.97	1.64	6.25	2.29	12.6	0.75	0.03	Low	0	PRE_peak_16	0.69	0.39	0.36	0.33	0.47
-VT1404_Kvon	Unknown	dorsal ectoderm	TSS	chr2L	2752765	2754884	Kvon et al. (2012)	13.32	26.71	0.62	0.25	5.51	12.43	6.66	11.24	8.3	18.43			Low	297613	PRE_peak_24	2.62	2.59	2.76	2.24	1.38
-VT15341_Kvon	Unknown	mesoderm	TSS	chr2R	7779541	7781099	Kvon et al. (2012)	10.8	19.43	0.97	0.4	3.82	6.22	4.98	8.84	27.61	18.82			Low	326084	PRE_peak_114	2.51	2.84	2.31	2.31	1.49
-VT17873_Kvon	CG5522	mesoderm	TSS	chr2R	12671212	12673370	Kvon et al. (2012)	4.65	14.61	0.31	0.3	3.94	3.84	4.91	3.67	70.43	11.12	73.78	48.89	Low	199576	PRE_peak_149	1.8	2.36	2.38	1.15	0.49
-VT20119_Kvon	ktub	mesoderm	TSS	chr2R	16988930	16989475	Kvon et al. (2012)	1.38	2.13	0.31	0.24	1.46	1.58	2.85	3.34	26.88	2.69	1.16	6.28	Low	139708	PRE_peak_162	2.82	2.81	2.5	2.13	0.82
-VT21015_Kvon	Unknown	mesoderm	Intragenic	chr2R	18689548	18691090	Kvon et al. (2012)	3.23	13.37	0.23	0.15	2.55	3.56	7.13	6.83	71.88	11.31			Low	56305	PRE_peak_166	2.88	3.09	2.06	1.85	0.84
-VT26325_Kvon	CG10479	dorsal ectoderm	TSS	chr3L	5976078	5978250	Kvon et al. (2012)	1.96	2.6	1.65	2.89	2.06	1.57	1.93	13.55	7.66	25.01	19.94	99.96	Low	100625	PRE_peak_199	0.63	0.91	0.64	0.51	0.36
-VT34695_Kvon	Unknown	dorsal ectoderm	Intragenic	chr3L	22175053	22177267	Kvon et al. (2012)	1.6	0.95	0.91	1.36	2.25	0.93	1.77	7.55	1.75	15.5			Low	48827	PRE_peak_268	0.58	0.49	0.46	0.38	0.4
-VT36350_Kvon	Unknown	dorsal ectoderm	Intragenic	chr3R	282570	284657	Kvon et al. (2012)	2.02	0.56	2.24	1.23	1.91	0.52	2.8	3.56	2.44	17.9			Low	109819	PRE_peak_271	0.53	0.3	0.21	0.31	0.42
-VT37495_Kvon	zen2	dorsal ectoderm	Intragenic	chr3R	2548627	2550765	Kvon et al. (2012)	0.74	0.55	2.33	2.89	1.48	1.26	2.67	8.5	11.22	8.73	33.59	1.31	Low	16567	PRE_peak_279	0.81	0.8	0.67	0.45	0.45
-VT42492_Kvon	tara	dorsal ectoderm	Intragenic	chr3R	12076924	12079107	Kvon et al. (2012)	9.48	20.41	0.12	0.34	3.13	3.25	3.23	11.39	14.37	35.7	5.09	9.19	Low	132312	PRE_peak_352	1.34	1.36	1.2	0.86	1.06
-VT44117_Kvon	Dl	dorsal ectoderm	Intergenic	chr3R	15157311	15159508	Kvon et al. (2012)	3.43	9.65	0.8	0.44	2.74	3.35	1.65	15.49	38.09	27.46	68.57	83.24	Low	407487	PRE_peak_408	1.05	1.39	1.08	0.38	0.35
-VT44757_Kvon	Unknown	dorsal ectoderm	Intragenic	chr3R	16368758	16370878	Kvon et al. (2012)	4.42	1.68	0.63	0.43	3.44	1.7	5.02	9.46	6.11	12.19			Low	301591	PRE_peak_410	2.44	2.17	1.17	1.68	0.4
-VT49279_Kvon	Unknown	dorsal ectoderm	Intergenic	chr3R	25088511	25090669	Kvon et al. (2012)	1.59	2.24	0.73	0.8	2.11	1.38	2.36	4.08	19.37	12.14			Low	291081	PRE_peak_442	1.77	1.76	0.97	1.2	0.38
-VT56148_Kvon	N	mesoderm	Intragenic	chrX	3032372	3034558	Kvon et al. (2012)	6.87	7.27	0.21	0.56	5.25	5.38	2.56	5.13	12.59	14.63	26.05	32.41	Low	703134	PRE_peak_498	0.98	1.07	0.87	0.82	0.46
-VT57022_Kvon	Unknown	dorsal ectoderm	TSS	chrX	4833051	4835256	Kvon et al. (2012)	4.86	4.54	0.62	0.2	2.22	2.01	3.85	6.76	14.11	11.15			Low	321321	PRE_peak_515	1.66	1.79	1.28	1	0.65
-VT6477_Kvon	pdm2	dorsal ectoderm	Intragenic	chr2L	12665181	12667293	Kvon et al. (2012)	1.79	1.09	1.85	4.73	2.08	1.53	3.71	15.76	11.48	18.31	14.56	17.93	Low	10787	PRE_peak_61	1.02	1.04	0.6	0.26	0.3
-VT7402_Kvon	noc	mesoderm	TSS	chr2L	14485084	14487223	Kvon et al. (2012)	0.88	3.33	2.79	4.1	1.61	1.42	7.96	8.25	36.52	11.69	13.7	85.4	Low	2763	PRE_peak_63	1.72	1.19	0.95	0.76	0.46
-VT8889_Kvon	Lrch	mesoderm	TSS	chr2L	17381424	17383547	Kvon et al. (2012)	3.15	2.07	0.58	0.8	2.98	2.15	21.59	3.92	50.57	7.35	19.04	27.91	Low	190991	PRE_peak_71	1.03	1.03	0.87	0.64	0.43
-VT9677_Kvon	tup	dorsal ectoderm	TSS	chr2L	18893565	18895695	Kvon et al. (2012)	5.15	0.97	1.93	8.14	2.6	1.49	2.61	30.02	11	81.81	35.8	1.14	Low	11806	PRE_peak_79	1.48	1.23	0.89	0.54	0.42
-wntD_Zeitlinger	wntD	mesoderm	TSS	chr3R	9118955	9119462	Zeitlinger et al. (2007)	0.54	1.68	1.67	0.55	1.63	1.82	15.1	4.44	38.77	6.13	0.52	58.06	Low	218264	PRE_peak_342	2.68	2.67	1.29	0.24	0.4
-zen_dist_Doyle	zen	dorsal ectoderm	TSS	chr3R	2580742	2581377	Doyle et al. (1989)	7.26	1.81	1.34	2.64	3.58	1.43	25.08	7.46	40.51	14.68	125.65	19.88	Low	12687	PRE_peak_280	0.69	0.36	0.43	0.24	0.23
-zen_prox_Doyle	zen	dorsal ectoderm	TSS	chr3R	2580211	2580586	Doyle et al. (1989)	2.46	1.65	1.52	3.64	1.9	1.68	3.81	15.23	8.32	29.63	125.65	19.88	Low	12156	PRE_peak_280	3.32	0.94	0.47	0.26	0.36
+enhancer_name	target_gene_name	enhancer_type	classification	chr	start	end	reference	H3K27ac_gd7_enrichment	H3K27ac_Toll10b_enrichment	H3K27me3_gd7_enrichment	H3K27me3_Toll10b_enrichment	H3K4me1_gd7_enrichment	H3K4me1_Toll10b_enrichment	dl_Toll10b_enrichment	mad_gd7_enrichment	twi_Toll10b_enrichment	zen_gd7_enrichment	FPKM_gd7	FPKM_Toll10b	DifferentialExpression	H3K27me3_classification	PRE_distance	PRE_peak_name	DHS_score_stage_5	DHS_score_stage_9	DHS_score_stage_10	DHS_score_stage_11	DHS_score_stage_14
+Ady43A_Markstein	Ady43A	mesoderm	TSS	chr2R	3133869	3134085	Markstein et al. (2004)	0.8	1.96	0.51	0.43	1.27	0.74	2.86	1.3	1.69	0.6	0.69	1.72	Not differential	Low	171851	PRE_peak_96	0.21	0.12	0.08	0.24	0.53
+Ance_Rusch	Ance	dorsal ectoderm	TSS	chr2L	13904733	13905265	Rusch and Levine (1997)	12.24	10.9	0.43	0.18	3.93	2.62	2.52	10.6	12.35	21.57	93.94	36.15	Higher in gd7	Low	505032	PRE_peak_62	1.26	1.49	1.83	1.03	0.44
+apt_Ozdemir	apt	mesoderm	Intragenic	chr2R	19460067	19462066	Ozdemir et al. (2011)	0.85	2.24	0.77	1.37	2.1	1.74	2.2	5.45	33.15	4.92	69.54	64.09	Not differential	Low	46786	PRE_peak_170	2.53	2.7	2.17	1.23	0.69
+Asph_Ozdemir	Asph	mesoderm	TSS	chr2R	11997142	11999642	Ozdemir et al. (2011)	3.38	14.25	0.29	0.19	3.02	3.8	9.18	5.45	45.76	8.72	11.87	146.94	Higher in Toll10b	Low	274375	PRE_peak_147	1.21	1.24	1.25	0.72	0.43
+BobA_Ozdemir	Unknown	mesoderm	Intergenic	chr3L	14945343	14947303	Ozdemir et al. (2011)	2.7	4.76	0.84	1.06	1.91	1.73	5.94	2.67	41.31	2.25				Low	89695	PRE_peak_246	1.02	1.53	1.1	0.37	0.32
+C15_650_Lin	C15	dorsal ectoderm	Intragenic	chr3R	17331786	17332437	Lin et al. (2006)	1.37	0.5	2.46	9.45	2.01	1.08	1.22	14.7	0.86	23.39	11.59	0	Higher in gd7	Low	6109	PRE_peak_418	1.36	1.35	1.36	0.65	0.3
+cact_Sandmann	cact	mesoderm	Intragenic	chr2L	16319411	16320423	Sandmann et al. (2007)	1.12	8.78	0.26	0.18	1.8	3.76	11.28	1.2	55.98	0.76	285.36	573.88	Higher in Toll10b	Low	102147	PRE_peak_68	0.78	0.95	0.48	0.3	0.31
+CG4221_Sandmann	CG4221	mesoderm	TSS	chr3R	11746513	11748343	Sandmann et al. (2007)	4.13	13.36	0.58	0.35	2.63	4.67	3.58	7.72	65.48	16.09	5.67	47.52	Higher in Toll10b	Low	66576	PRE_peak_348	2.06	1.91	2.03	1.24	0.63
+CG8788_Sandmann	CG8788	mesoderm	TSS	chr2R	5025946	5026574	Sandmann et al. (2007)	4.04	7.97	0.22	0.12	2.8	2.19	3.78	4.67	55.5	4.14	87.13	86.25	Not differential	Low	803815	PRE_peak_103	2.68	3.24	2.44	1.96	0.78
+Cnx99A_Ozdemir	Unknown	mesoderm	Intergenic	chr3R	25134141	25135377	Ozdemir et al. (2011)	1.54	6.98	1.11	0.89	2.22	1.64	8.43	2.75	89.67	1.5				Low	246373	PRE_peak_442	1.16	1.35	0.68	0.93	0.43
+Cyp310a1_Ozdemir	Cyp310a1	mesoderm	TSS	chr2L	18652293	18653292	Ozdemir et al. (2011)	0.73	15.47	0.87	0.43	1.16	4.31	14.96	1.68	107.03	1.49	0.55	258.2	Not differential	Low	53765	PRE_peak_75	1.57	1.11	0.55	0.38	0.37
+dpp_Huang	dpp	dorsal ectoderm	Intragenic	chr2L	2455866	2457725	Huang et al. (1993)	5.25	2.31	2.91	7.33	3.58	2.33	23.31	24.47	12.37	41.46	18.74	3.01	Higher in gd7	Low	714	PRE_peak_24	2.5	1.4	0.75	0.29	0.4
+Dscam_Ozdemir	Unknown	mesoderm	TSS	chr2R	3268100	3268475	Ozdemir et al. (2011)	4	2.99	0.61	1.33	2.69	2.49	22.16	5.54	127.93	5.61				Low	37461	PRE_peak_96	4.02	3.68	2.51	1.49	0.81
+Dtg_Hodar	Dtg	dorsal ectoderm	TSS	chr3R	8473379	8473902	Hodar et al. (2014)	3.4	4.74	0.52	0.93	2.65	3.28	4.51	4.89	16.65	6.5	246.6	115.37	Higher in gd7	Low	366417	PRE_peak_338	2.86	2.99	2.74	3.24	1.64
+emc_Ozdemir	Unknown	mesoderm	TSS	chr3L	742059	743659	Ozdemir et al. (2011)	4.81	9.52	0.57	1.44	1.69	1.63	15.16	1.02	76.35	3.75				Low	25777	PRE_peak_185	0.9	1.04	0.67	0.66	0.44
+htl_Stathopoulos	htl	mesoderm	TSS	chr3R	13875600	13876391	Stathopoulos et al. (2004)	1.52	7.13	1.77	0.79	1.32	2.3	4.12	2.18	45.59	1.97	0.8	79.72	Higher in Toll10b	Low	12581	PRE_peak_405	1.73	1.86	1.37	1.19	0.59
+Ilp4_Stathopoulos	Ilp4	mesoderm	TSS	chr3L	9797449	9797743	Stathopoulos et al. (2002)	1.65	8.12	0.87	0.45	1.71	2.21	7.93	3.41	16.54	8.81	26.62	1968.19	Higher in Toll10b	Low	421360	PRE_peak_211	0.8	0.42	0.53	0.27	0.29
+Mdr49_Zeitlinger	Mdr49	mesoderm	TSS	chr2R	8833934	8834294	Zeitlinger et al. (2007)	1.39	5.39	1.8	2.76	2.06	3.83	5.33	3.87	12.28	3.83	2.88	222.56	Higher in Toll10b	Low	9049	PRE_peak_119	1.89	2.21	1.53	1.22	0.36
+Mef2_Nguyen	Mef2	mesoderm	Intragenic	chr2R	5819214	5819493	Nguyen and Xu (1998)	0.49	5.83	1.09	0.78	0.7	2.03	6.52	0.3	74.77	0.76	7.36	52.38	Higher in Toll10b	Low	10896	PRE_peak_103	1.39	2.27	1.84	1.66	0.33
+Mef2_Ozdemir	Mef2	mesoderm	TSS	chr2R	5847634	5848273	Ozdemir et al. (2011)	7.71	18.38	0.36	0.2	2.39	2.13	8.03	3.78	100.12	3.69	7.36	52.38	Higher in Toll10b	Low	16682	PRE_peak_104	2.32	2.52	1.64	1.09	0.59
+mir-1_Biemar	mir-1	mesoderm	Intragenic	chr2L	20480577	20481741	Biemar et al. (2006)	0.68	3.8	0.9	0.39	0.63	1.62	5.44	0.57	84.81	3.51				Low	288623	PRE_peak_81	0.76	1.5	1.04	0.46	0.39
+mir-1_Zeitlinger	mir-1	mesoderm	Intragenic	chr2L	20475806	20477901	Zeitlinger et al. (2007)	0.42	5.49	0.83	0.43	0.66	1.91	6.9	0.82	54.85	1.43				Low	292463	PRE_peak_81	0.33	0.67	0.72	1.01	0.6
+Ocho_Ozdemir	Unknown	mesoderm	TSS	chr3L	14968341	14970091	Ozdemir et al. (2011)	4.03	14.37	0.8	1.28	2.9	9.52	21.82	4.9	105.17	4.41				Low	66907	PRE_peak_246	1.54	2.2	1.7	1.48	0.41
+Phm_Markstein	Phm	mesoderm	TSS	chr2R	19875348	19875790	Markstein et al. (2004)	2.27	11.65	0.46	0.23	1.54	2.07	28.04	2.34	60.55	1.87	11.54	19.67	Not differential	Low	340537	PRE_peak_172	1.82	1.62	0.64	0.9	0.48
+pnr_Zeitlinger	pnr	dorsal ectoderm	Intragenic	chr3R	11854234	11854784	Zeitlinger et al. (2007)	2.59	0.48	3.18	8.33	2.32	1.36	1.66	25.19	6.88	44.58	36.99	0.57	Higher in gd7	Low	2209	PRE_peak_350	2.35	1.91	0.58	0.28	0.38
+pnt_Ozdemir	Unknown	mesoderm	Intragenic	chr3R	19169181	19170380	Ozdemir et al. (2011)	1.21	3.2	1.97	1.16	2.36	2.92	5.4	5.18	54.93	6.21				Low	47694	PRE_peak_432	2.29	2.83	2.27	1.98	0.32
+sna_Ip	sna	mesoderm	TSS	chr2L	15478144	15481082	Ip et al. (1992b)	0.64	5.89	7.4	3.08	1.99	2.32	45.96	5.58	58.18	19.15	2.08	753.54	Higher in Toll10b	Low	144080	PRE_peak_67	1.24	1.18	0.99	1.07	0.46
+sna-S_Perry	sna	mesoderm	TSS	chr2L	15485484	15486749	Perry et al. (2010)	0.55	4.78	5.31	3.65	1.76	2.22	36.1	4.36	148.21	11.34	2.08	753.54	Higher in Toll10b	Low	151420	PRE_peak_67	1.7	1.01	0.62	0.36	0.3
+stumps_Sandmann	stumps	mesoderm	TSS	chr3R	10414437	10416493	Sandmann et al. (2007)	0.63	7.09	1.39	1.82	1.19	2.48	8.66	1.54	66.67	1.59	0.29	154.76	Higher in Toll10b	Low	686704	PRE_peak_347	0.64	1.32	0.9	0.91	0.4
+T48_Sandmann	T48	mesoderm	TSS	chr3R	22707641	22709469	Sandmann et al. (2007)	1.49	5.11	0.43	0.73	1.76	3	3.03	3.15	40.8	5	3.26	17.14	Higher in Toll10b	Low	194	PRE_peak_436	0.7	0.7	0.77	0.56	0.37
+tin_Yin	tin	mesoderm	Intragenic	chr3R	17205819	17205999	Yin et al. (1997)	0.35	4.72	13.53	11.18	1.42	2.71	6.17	1.32	43.37	2.21	0.17	100.83	Higher in Toll10b	Low	980	PRE_peak_411	1.92	2.41	1.95	0.65	0.44
+tld_Kirov	tld	dorsal ectoderm	TSS	chr3R	20574728	20575524	Kirov et al. (1994)	1.51	0.8	0.54	1.13	2.59	2.05	6.19	7.42	11.08	32.39	52.75	2.44	Higher in gd7	Low	330687	PRE_peak_433	3.04	2.97	1.95	2.1	0.35
+trbl_Sandmann	trbl	mesoderm	TSS	chr3L	20394270	20396658	Sandmann et al. (2007)	12.2	13.07	0.23	0.12	3.92	3.02	8.37	8.38	49.84	19.46	67.23	207.57	Higher in Toll10b	Low	216832	PRE_peak_254	2.86	2.69	2.47	1.73	0.68
+tup_Zeitlinger	tup	dorsal ectoderm	Intragenic	chr2L	18875141	18875548	Zeitlinger et al. (2007)	2.77	1.03	1.43	8.39	5.05	1.47	2.5	32.91	20.08	38.39	35.8	1.14	Higher in gd7	Low	5564	PRE_peak_79	1.9	1.75	1.51	0.84	0.35
+twi_Jiang	twi	mesoderm	TSS	chr2R	18932429	18933663	Jiang et al. (1991)	1.24	12.53	8.59	5.57	3.1	3.39	12.35	5.28	21.54	5.52	0.19	708.85	Higher in Toll10b	Low	0	PRE_peak_168	0.84	0.59	0.57	0.35	0.29
+twi_Ozdemir	twi	mesoderm	Intergenic	chr2R	18936997	18938126	Ozdemir et al. (2011)	0.56	9.26	10.45	4.85	1.48	2.41	9.56	4.26	66.31	9.34	0.19	708.85	Higher in Toll10b	Low	0	PRE_peak_169	1.73	1.91	1.31	1.1	0.33
+VT0984_Kvon	erm	dorsal ectoderm	Intragenic	chr2L	1958014	1960258	Kvon et al. (2012)	0.68	0.4	11.86	15.32	1.28	0.97	1.64	6.25	2.29	12.6	0.75	0.03	Higher in gd7	Low	0	PRE_peak_16	0.69	0.39	0.36	0.33	0.47
+VT1404_Kvon	Unknown	dorsal ectoderm	TSS	chr2L	2752765	2754884	Kvon et al. (2012)	13.32	26.71	0.62	0.25	5.51	12.43	6.66	11.24	8.3	18.43				Low	297613	PRE_peak_24	2.62	2.59	2.76	2.24	1.38
+VT15341_Kvon	Unknown	mesoderm	TSS	chr2R	7779541	7781099	Kvon et al. (2012)	10.8	19.43	0.97	0.4	3.82	6.22	4.98	8.84	27.61	18.82				Low	326084	PRE_peak_114	2.51	2.84	2.31	2.31	1.49
+VT17873_Kvon	CG5522	mesoderm	TSS	chr2R	12671212	12673370	Kvon et al. (2012)	4.65	14.61	0.31	0.3	3.94	3.84	4.91	3.67	70.43	11.12	73.78	48.89	Higher in gd7	Low	199576	PRE_peak_149	1.8	2.36	2.38	1.15	0.49
+VT20119_Kvon	ktub	mesoderm	TSS	chr2R	16988930	16989475	Kvon et al. (2012)	1.38	2.13	0.31	0.24	1.46	1.58	2.85	3.34	26.88	2.69	1.16	6.28	Higher in Toll10b	Low	139708	PRE_peak_162	2.82	2.81	2.5	2.13	0.82
+VT21015_Kvon	Unknown	mesoderm	Intragenic	chr2R	18689548	18691090	Kvon et al. (2012)	3.23	13.37	0.23	0.15	2.55	3.56	7.13	6.83	71.88	11.31				Low	56305	PRE_peak_166	2.88	3.09	2.06	1.85	0.84
+VT26325_Kvon	CG10479	dorsal ectoderm	TSS	chr3L	5976078	5978250	Kvon et al. (2012)	1.96	2.6	1.65	2.89	2.06	1.57	1.93	13.55	7.66	25.01	19.94	99.96	Higher in Toll10b	Low	100625	PRE_peak_199	0.63	0.91	0.64	0.51	0.36
+VT34695_Kvon	Unknown	dorsal ectoderm	Intragenic	chr3L	22175053	22177267	Kvon et al. (2012)	1.6	0.95	0.91	1.36	2.25	0.93	1.77	7.55	1.75	15.5				Low	48827	PRE_peak_268	0.58	0.49	0.46	0.38	0.4
+VT36350_Kvon	Unknown	dorsal ectoderm	Intragenic	chr3R	282570	284657	Kvon et al. (2012)	2.02	0.56	2.24	1.23	1.91	0.52	2.8	3.56	2.44	17.9				Low	109819	PRE_peak_271	0.53	0.3	0.21	0.31	0.42
+VT37495_Kvon	zen2	dorsal ectoderm	Intragenic	chr3R	2548627	2550765	Kvon et al. (2012)	0.74	0.55	2.33	2.89	1.48	1.26	2.67	8.5	11.22	8.73	33.59	1.31	Higher in gd7	Low	16567	PRE_peak_279	0.81	0.8	0.67	0.45	0.45
+VT42492_Kvon	tara	dorsal ectoderm	Intragenic	chr3R	12076924	12079107	Kvon et al. (2012)	9.48	20.41	0.12	0.34	3.13	3.25	3.23	11.39	14.37	35.7	5.09	9.19	Higher in Toll10b	Low	132312	PRE_peak_352	1.34	1.36	1.2	0.86	1.06
+VT44117_Kvon	Dl	dorsal ectoderm	Intergenic	chr3R	15157311	15159508	Kvon et al. (2012)	3.43	9.65	0.8	0.44	2.74	3.35	1.65	15.49	38.09	27.46	68.57	83.24	Not differential	Low	407487	PRE_peak_408	1.05	1.39	1.08	0.38	0.35
+VT44757_Kvon	Unknown	dorsal ectoderm	Intragenic	chr3R	16368758	16370878	Kvon et al. (2012)	4.42	1.68	0.63	0.43	3.44	1.7	5.02	9.46	6.11	12.19				Low	301591	PRE_peak_410	2.44	2.17	1.17	1.68	0.4
+VT49279_Kvon	Unknown	dorsal ectoderm	Intergenic	chr3R	25088511	25090669	Kvon et al. (2012)	1.59	2.24	0.73	0.8	2.11	1.38	2.36	4.08	19.37	12.14				Low	291081	PRE_peak_442	1.77	1.76	0.97	1.2	0.38
+VT56148_Kvon	N	mesoderm	Intragenic	chrX	3032372	3034558	Kvon et al. (2012)	6.87	7.27	0.21	0.56	5.25	5.38	2.56	5.13	12.59	14.63	26.05	32.41	Not differential	Low	703134	PRE_peak_498	0.98	1.07	0.87	0.82	0.46
+VT57022_Kvon	Unknown	dorsal ectoderm	TSS	chrX	4833051	4835256	Kvon et al. (2012)	4.86	4.54	0.62	0.2	2.22	2.01	3.85	6.76	14.11	11.15				Low	321321	PRE_peak_515	1.66	1.79	1.28	1	0.65
+VT6477_Kvon	pdm2	dorsal ectoderm	Intragenic	chr2L	12665181	12667293	Kvon et al. (2012)	1.79	1.09	1.85	4.73	2.08	1.53	3.71	15.76	11.48	18.31	14.56	17.93	Not differential	Low	10787	PRE_peak_61	1.02	1.04	0.6	0.26	0.3
+VT7402_Kvon	noc	mesoderm	TSS	chr2L	14485084	14487223	Kvon et al. (2012)	0.88	3.33	2.79	4.1	1.61	1.42	7.96	8.25	36.52	11.69	13.7	85.4	Higher in Toll10b	Low	2763	PRE_peak_63	1.72	1.19	0.95	0.76	0.46
+VT8889_Kvon	Lrch	mesoderm	TSS	chr2L	17381424	17383547	Kvon et al. (2012)	3.15	2.07	0.58	0.8	2.98	2.15	21.59	3.92	50.57	7.35	19.04	27.91	Not differential	Low	190991	PRE_peak_71	1.03	1.03	0.87	0.64	0.43
+VT9677_Kvon	tup	dorsal ectoderm	TSS	chr2L	18893565	18895695	Kvon et al. (2012)	5.15	0.97	1.93	8.14	2.6	1.49	2.61	30.02	11	81.81	35.8	1.14	Higher in gd7	Low	11806	PRE_peak_79	1.48	1.23	0.89	0.54	0.42
+wntD_Zeitlinger	wntD	mesoderm	TSS	chr3R	9118955	9119462	Zeitlinger et al. (2007)	0.54	1.68	1.67	0.55	1.63	1.82	15.1	4.44	38.77	6.13	0.52	58.06	Higher in Toll10b	Low	218264	PRE_peak_342	2.68	2.67	1.29	0.24	0.4
+zen_dist_Doyle	zen	dorsal ectoderm	TSS	chr3R	2580742	2581377	Doyle et al. (1989)	7.26	1.81	1.34	2.64	3.58	1.43	25.08	7.46	40.51	14.68	125.65	19.88	Higher in gd7	Low	12687	PRE_peak_280	0.69	0.36	0.43	0.24	0.23
+zen_prox_Doyle	zen	dorsal ectoderm	TSS	chr3R	2580211	2580586	Doyle et al. (1989)	2.46	1.65	1.52	3.64	1.9	1.68	3.81	15.23	8.32	29.63	125.65	19.88	Higher in gd7	Low	12156	PRE_peak_280	3.32	0.94	0.47	0.26	0.36
