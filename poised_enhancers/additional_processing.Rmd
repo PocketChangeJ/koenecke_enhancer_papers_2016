@@ -139,7 +139,7 @@ parallel -uj 2 python peakzilla/peakzilla.py -l \`basename {} bed\`log {} /data/
   /data/chipseq/bed/*dl*.bed \
   /data/chipseq/bed/*twi*.bed
 
-python peakzilla/peakzilla.py -l orer_nej_1.log /data/chipseq/bed/orer_nej_1.bed /data/chipseq/bed/orer_wce_1.bed > orer_nej_1.tsv
+pypy peakzilla/peakzilla.py -l orer_nej_1.log /data/chipseq/bed/orer_nej_1.bed /data/chipseq/bed/orer_wce_1.bed > orer_nej_1.tsv
 
 ```
 
